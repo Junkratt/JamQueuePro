@@ -1,3 +1,13 @@
+import { Inter } from 'next/font/google'
+import { AuthProvider } from './components/AuthProvider'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata = {
+  title: 'Jam Queue Pro',
+  description: 'Connect musicians, venues, and unforgettable jam sessions',
+}
+
 export default function RootLayout({
   children,
 }: {
@@ -5,7 +15,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body className={inter.className}>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   )
 }

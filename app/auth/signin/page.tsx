@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { signIn, getSession } from 'next-auth/react'
+import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function SignIn() {
@@ -28,8 +28,7 @@ export default function SignIn() {
       if (result?.error) {
         setError('Sign in failed. Please try again.')
       } else {
-        await getSession()
-        router.push('/')
+        router.push('/dashboard')
       }
     } catch (err) {
       setError('Something went wrong. Please try again.')

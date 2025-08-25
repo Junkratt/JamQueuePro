@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import Navigation from './components/Navigation'
 
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
 export default function Home() {
-  const { data: session, status } = useSession()
   const [dbStatus, setDbStatus] = useState({
     success: false,
     userCount: 0,
@@ -15,7 +17,6 @@ export default function Home() {
   })
 
   useEffect(() => {
-    // Only fetch after component mounts (client-side)
     fetch('/api/db-setup', { method: 'POST' })
       .then(res => res.json())
       .then(data => {
@@ -63,23 +64,6 @@ export default function Home() {
             </p>
           </header>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-12">
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">For Musicians</h3>
-              <p className="text-gray-600">Find local jams, connect with other players, and showcase your skills</p>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">For Venues</h3>
-              <p className="text-gray-600">Manage events, attract performers, and build your music community</p>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow-md p-6 text-center">
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">For Organizers</h3>
-              <p className="text-gray-600">Streamline event management and keep the music flowing</p>
-            </div>
-          </div>
-
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">System Status</h2>
             
@@ -108,18 +92,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {status !== 'loading' && !session && (
-            <div className="mt-8 text-center">
-              <p className="text-gray-600 mb-4">Ready to get started?</p>
-              <button 
-                onClick={() => window.location.href = '/auth/signin'}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-              >
-                Sign Up Now
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

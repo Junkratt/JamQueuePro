@@ -66,18 +66,22 @@ export default function Profile() {
         body: JSON.stringify(profile)
       })
 
+      const data = await response.json()
+
       if (response.ok) {
         setMessage('Profile updated successfully!')
       } else {
-        setMessage('Failed to update profile. Please try again.')
+        // Show the actual error from the API
+        setMessage(`Failed to update profile: ${data.error || 'Unknown error'}`)
+        console.error('API Error:', data)
       }
     } catch (error) {
-      setMessage('Something went wrong. Please try again.')
+      setMessage('Network error. Please try again.')
+      console.error('Network error:', error)
     } finally {
       setIsLoading(false)
     }
   }
-
   const addInstrument = (instrument: string) => {
     if (instrument && !profile.instruments.includes(instrument)) {
       setProfile({

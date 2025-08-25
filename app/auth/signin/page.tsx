@@ -7,8 +7,7 @@ import { useRouter } from 'next/navigation'
 export default function SignIn() {
   const [formData, setFormData] = useState({
     email: '',
-    name: '',
-    role: 'musician'
+    name: ''
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,16 +22,14 @@ export default function SignIn() {
       const result = await signIn('credentials', {
         email: formData.email,
         name: formData.name,
-        role: formData.role,
         redirect: false,
       })
 
       if (result?.error) {
         setError('Sign in failed. Please try again.')
       } else {
-        // Sign in successful
-        await getSession() // Refresh session
-        router.push('/dashboard')
+        await getSession()
+        router.push('/')
       }
     } catch (err) {
       setError('Something went wrong. Please try again.')
@@ -87,25 +84,6 @@ export default function SignIn() {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                I am a...
-              </label>
-              <div className="mt-1">
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="musician">Musician</option>
-                  <option value="venue_owner">Venue Owner</option>
-                  <option value="organizer">Event Organizer</option>
-                </select>
               </div>
             </div>
 

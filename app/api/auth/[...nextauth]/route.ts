@@ -12,13 +12,12 @@ const handler = NextAuth({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        name: { label: 'Name', type: 'text' },
-        role: { label: 'Role', type: 'text' }
+        name: { label: 'Name', type: 'text' }
       },
       async authorize(credentials) {
         if (!credentials?.email) return null
         
-        // Find or create user
+        // Find or create user - only use fields that exist in current schema
         let user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })
@@ -27,8 +26,7 @@ const handler = NextAuth({
           user = await prisma.user.create({
             data: {
               email: credentials.email,
-              name: credentials.name || '',
-              role: credentials.role || 'musician'
+              name: credentials.name || ''
             }
           })
         }
@@ -36,8 +34,7 @@ const handler = NextAuth({
         return {
           id: user.id,
           email: user.email,
-          name: user.name,
-          role: user.role
+          name: user.name
         }
       }
     })
@@ -49,14 +46,10 @@ const handler = NextAuth({
     async session({ session, token }) {
       if (session.user && token) {
         session.user.id = token.sub as string
-        session.user.role = token.role as string
       }
       return session
     },
     async jwt({ token, user }) {
-      if (user) {
-        token.role = (user as any).role
-      }
       return token
     }
   },

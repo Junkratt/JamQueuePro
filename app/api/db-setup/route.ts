@@ -4,9 +4,8 @@ const prisma = new PrismaClient()
 
 export async function POST() {
   try {
-    // Execute the schema creation manually
+    // Create User table
     await prisma.$executeRaw`
-      -- Users table
       CREATE TABLE IF NOT EXISTS "User" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "email" TEXT NOT NULL UNIQUE,
@@ -21,9 +20,10 @@ export async function POST() {
         "bio" TEXT,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
+      )`
 
-      -- Venues table
+    // Create Venue table
+    await prisma.$executeRaw`
       CREATE TABLE IF NOT EXISTS "Venue" (
         "id" TEXT NOT NULL PRIMARY KEY,
         "name" TEXT NOT NULL,
@@ -39,9 +39,8 @@ export async function POST() {
         "amenities" TEXT[],
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-    `
-    
+      )`
+
     // Test that tables were created
     const userCount = await prisma.user.count()
     const venueCount = await prisma.venue.count()

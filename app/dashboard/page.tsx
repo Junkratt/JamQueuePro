@@ -3,9 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-
-export const runtime = 'edge'
-export const dynamic = 'force-dynamic'
+import Link from 'next/link'
 
 export default function Dashboard() {
   const [mounted, setMounted] = useState(false)
@@ -38,6 +36,12 @@ export default function Dashboard() {
             <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
             
             <div className="flex items-center space-x-4">
+              <Link 
+                href="/profile"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Profile
+              </Link>
               <span className="text-gray-700">
                 Welcome, {session.user?.name || session.user?.email}
               </span>
@@ -54,9 +58,29 @@ export default function Dashboard() {
 
       <div className="py-12 px-4">
         <div className="max-w-4xl mx-auto">
-          <h2 className="text-2xl font-bold mb-6">Welcome to your Dashboard</h2>
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <p className="text-gray-600">Dashboard features coming soon...</p>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+              <div className="space-y-3">
+                <Link 
+                  href="/profile"
+                  className="block w-full text-left px-4 py-3 bg-blue-50 hover:bg-blue-100 rounded-md text-blue-700 transition-colors"
+                >
+                  Update Your Profile
+                </Link>
+                <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
+                  Find Local Venues (Coming Soon)
+                </button>
+                <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
+                  Browse Jam Sessions (Coming Soon)
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
+              <p className="text-gray-600">No recent activity yet. Complete your profile to get started!</p>
+            </div>
           </div>
         </div>
       </div>

@@ -16,62 +16,121 @@ model User {
   instruments   String[]
   musicPrefs    String[]
   facebookId    String?
+  profileImage  String?
+  experience    String?   // "beginner", "intermediate", "advanced"
+  bio           String?
   createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   
+  // Relations
   organizedEvents Event[] @relation("OrganizerEvents")
   signups        EventSignup[]
-  venues         VenueOrganizer[]
+  venueRoles     VenueOrganizer[]
+  knownSongs     UserSong[]
 }
 
 model Venue {
   id          String   @id @default(cuid())
   name        String
   address     String
+  city        String
+  state       String
+  zipCode     String
   email       String
   phone       String?
+  website     String?
+  description String?
+  capacity    Int?
+  amenities   String[] // ["sound_system", "instruments", "stage"]
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   
   events      Event[]
   organizers  VenueOrganizer[]
 }
 
+model VenueOrganizer {
+  id       String  @id @default(cuid())
+  venueId  String
+  venue    Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     String  @default("organizer") // "owner", "manager", "organizer"
+  approved Boolean @default(false)
+  createdAt DateTime @default(now())
+  
+  @@unique([venueId, userId])
+}
+
 model Event {
   id          String   @id @default(cuid())
   title       String
+  description String?
   dateTime    DateTime
-  type        String   // "full_band" or "songwriter"
+  duration    Int      @default(240) // minutes
+  type        String   // "full_band", "songwriter", "open_mic"
   maxCapacity Int?
+  signupDeadline DateTime?
+  houseband   Boolean  @default(false)
+  housebandSongs String[] // songs the house band knows
+  status      String   @default("upcoming") // "upcoming", "active", "completed", "cancelled"
   
   venueId     String
-  venue       Venue    @relation(fields: [venueId], references: [id])
+  venue       Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
   organizerId String
   organizer   User     @relation("OrganizerEvents", fields: [organizerId], references: [id])
   
   signups     EventSignup[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([dateTime])
+  @@index([venueId])
 }
 
 model EventSignup {
   id           String   @id @default(cuid())
   queuePosition Int
   instruments  String[]
-  needsMembers String[]
+  needsMembers String[] // instruments they need
+  songChoice   String?  // requested song
+  notes        String?  // special requests
+  status       String   @default("queued") // "queued", "performing", "completed", "cancelled"
   signupTime   DateTime @default(now())
+  performanceStart DateTime?
+  performanceEnd   DateTime?
   
   eventId      String
-  event        Event    @relation(fields: [eventId], references: [id])
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
   userId       String
-  user         User     @relation(fields: [userId], references: [id])
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   @@unique([eventId, userId])
+  @@index([eventId, queuePosition])
 }
 
-model VenueOrganizer {
+model Song {
   id       String @id @default(cuid())
-  venueId  String
-  venue    Venue  @relation(fields: [venueId], references: [id])
-  userId   String
-  user     User   @relation(fields: [userId], references: [id])
-  approved Boolean @default(false)
+  title    String
+  artist   String
+  genre    String?
+  key      String?
+  tempo    String? // "slow", "medium", "fast"
+  difficulty String? // "easy", "medium", "hard"
   
-  @@unique([venueId, userId])
+  userSongs UserSong[]
+  
+  @@unique([title, artist])
+  @@index([genre])
+}
+
+model UserSong {
+  id           String @id @default(cuid())
+  userId       String
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId       String
+  song         Song   @relation(fields: [songId], references: [id], onDelete: Cascade)
+  proficiency  String @default("learning") // "learning", "comfortable", "expert"
+  
+  @@unique([userId, songId])
 }

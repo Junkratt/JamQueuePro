@@ -2,20 +2,27 @@
 
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
+
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
 
 export default function Dashboard() {
+  const [mounted, setMounted] = useState(false)
   const { data: session, status } = useSession()
   const router = useRouter()
 
   useEffect(() => {
-    if (status === 'loading') return
-    if (!session) {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted && status !== 'loading' && !session) {
       router.push('/auth/signin')
     }
-  }, [session, status, router])
+  }, [session, status, router, mounted])
 
-  if (status === 'loading') {
+  if (!mounted || status === 'loading') {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 

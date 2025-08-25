@@ -1,22 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   experimental: {
     esmExternals: false,
   },
-  // Force dynamic rendering for pages that use authentication
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, must-revalidate',
-          },
-        ],
-      },
-    ]
-  }
+  // Disable static optimization completely
+  trailingSlash: false,
+  generateEtags: false,
+  poweredByHeader: false,
 }
 
 module.exports = nextConfig

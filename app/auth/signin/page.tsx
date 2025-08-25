@@ -4,6 +4,9 @@ import { useState } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
+export const runtime = 'edge'
+export const dynamic = 'force-dynamic'
+
 export default function SignIn() {
   const [formData, setFormData] = useState({
     email: '',

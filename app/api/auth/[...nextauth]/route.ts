@@ -17,7 +17,6 @@ const handler = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email) return null
         
-        // Find or create user - only use fields that exist in current schema
         let user = await prisma.user.findUnique({
           where: { email: credentials.email }
         })
@@ -43,13 +42,21 @@ const handler = NextAuth({
     signIn: '/auth/signin',
   },
   callbacks: {
-    async session({ session, token }) {
-      if (session.user && token) {
-        session.user.id = token.sub as string
+    async session({ session, token, user }) {
+      // Add user id to session - handle different session sources
+      if (session.user) {
+        if (user?.id) {
+          (session.user as any).id = user.id
+        } else if (token?.sub) {
+          (session.user as any).id = token.sub
+        }
       }
       return session
     },
     async jwt({ token, user }) {
+      if (user) {
+        token.sub = user.id
+      }
       return token
     }
   },

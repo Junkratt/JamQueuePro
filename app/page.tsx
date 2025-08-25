@@ -1,31 +1,49 @@
-import { PrismaClient } from '@prisma/client'
+'use client'
 
-async function getDatabaseStatus() {
-  try {
-    const prisma = new PrismaClient()
-    const userCount = await prisma.user.count()
-    const venueCount = await prisma.venue.count()
-    await prisma.$disconnect()
-    
-    return { 
-      success: true, 
-      userCount, 
-      venueCount, 
-      message: 'Connected' 
-    }
-  } catch (error) {
-    console.error('Database error:', error)
-    return { 
-      success: false, 
-      userCount: 0, 
-      venueCount: 0, 
-      message: 'Error' 
-    }
-  }
-}
+import { useState, useEffect } from 'react'
 
-export default async function Home() {
-  const dbStatus = await getDatabaseStatus()
+export default function Home() {
+  const [dbStatus, setDbStatus] = useState({
+    success: false,
+    userCount: 0,
+    venueCount: 0,
+    message: 'Connecting...',
+    loading: true
+  })
+
+  useEffect(() => {
+    // Fetch status from our working API endpoint
+    fetch('/api/db-setup', { method: 'POST' })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setDbStatus({
+            success: true,
+            userCount: data.counts?.users || 0,
+            venueCount: data.counts?.venues || 0,
+            message: 'Connected',
+            loading: false
+          })
+        } else {
+          setDbStatus({
+            success: false,
+            userCount: 0,
+            venueCount: 0,
+            message: 'Error',
+            loading: false
+          })
+        }
+      })
+      .catch(() => {
+        setDbStatus({
+          success: false,
+          userCount: 0,
+          venueCount: 0,
+          message: 'Error',
+          loading: false
+        })
+      })
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">
@@ -46,7 +64,9 @@ export default async function Home() {
             <div className="flex justify-between items-center">
               <span className="font-medium">Database:</span>
               <span className={`px-3 py-1 rounded-full text-sm ${
-                dbStatus.success 
+                dbStatus.loading 
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : dbStatus.success 
                   ? 'bg-green-100 text-green-800' 
                   : 'bg-red-100 text-red-800'
               }`}>
@@ -64,14 +84,6 @@ export default async function Home() {
               <span className="text-gray-600">{dbStatus.venueCount}</span>
             </div>
           </div>
-          
-          {!dbStatus.success && (
-            <div className="mt-4 p-3 bg-yellow-100 rounded">
-              <p className="text-sm text-yellow-800">
-                Database connection failed. Tables may need to be created.
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

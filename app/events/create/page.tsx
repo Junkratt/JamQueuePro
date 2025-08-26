@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import Navigation from '../../components/Navigation'
 
 export default function CreateEvent() {
   const { data: session, status } = useSession()
@@ -70,7 +71,7 @@ export default function CreateEvent() {
       if (response.ok) {
         setMessage('Event created successfully!')
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/events')
         }, 2000)
       } else {
         setMessage(`Failed to create event: ${data.error || 'Unknown error'}`)
@@ -82,62 +83,351 @@ export default function CreateEvent() {
     }
   }
 
+  const addSong = (song: string) => {
+    if (song && !event.housebandSongs.includes(song)) {
+      setEvent({
+        ...event,
+        housebandSongs: [...event.housebandSongs, song]
+      })
+    }
+  }
+
+  const removeSong = (song: string) => {
+    setEvent({
+      ...event,
+      housebandSongs: event.housebandSongs.filter(s => s !== song)
+    })
+  }
+
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading...
+      </div>
+    )
   }
 
   if (!session) return null
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <h1 className="text-xl font-bold text-gray-900">Create Event</h1>
-            
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                Dashboard
-              </button>
-              <span className="text-gray-700">{session.user?.name}</span>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      </nav>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <Navigation />
 
-      <div className="py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4">Create Jam Session</h2>
-            <p className="text-gray-600">
-              Event creation system is being built. This page will allow you to:
-            </p>
-            <ul className="mt-4 space-y-2 text-gray-600">
-              <li>• Set event details (title, date, time)</li>
-              <li>• Choose venue location</li>
-              <li>• Set performer limits and signup deadlines</li>
-              <li>• Configure house band support</li>
-            </ul>
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
+          Create Jam Session
+        </h1>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Event Details</h2>
             
-            <div className="mt-6">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md"
-              >
-                Back to Dashboard
-              </button>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                Event Title *
+              </label>
+              <input
+                type="text"
+                required
+                value={event.title}
+                onChange={(e) => setEvent({ ...event, title: e.target.value })}
+                placeholder="e.g., Open Mic Night, Blues Jam Session"
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Venue *
+                </label>
+                <select
+                  required
+                  value={event.venueId}
+                  onChange={(e) => setEvent({ ...event, venueId: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="">Select a venue...</option>
+                  {venues.map((venue: any) => (
+                    <option key={venue.id} value={venue.id}>
+                      {venue.name} - {venue.city}, {venue.state}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Event Type *
+                </label>
+                <select
+                  value={event.type}
+                  onChange={(e) => setEvent({ ...event, type: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="open_mic">Open Mic</option>
+                  <option value="full_band">Full Band Jam</option>
+                  <option value="songwriter">Songwriter Night</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Date & Time *
+                </label>
+                <input
+                  type="datetime-local"
+                  required
+                  value={event.dateTime}
+                  onChange={(e) => setEvent({ ...event, dateTime: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Duration (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={event.duration}
+                  onChange={(e) => setEvent({ ...event, duration: parseInt(e.target.value) || 240 })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                Description
+              </label>
+              <textarea
+                value={event.description}
+                onChange={(e) => setEvent({ ...event, description: e.target.value })}
+                placeholder="Describe your event, what musicians should expect..."
+                rows={3}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '1rem',
+                  resize: 'vertical'
+                }}
+              />
             </div>
           </div>
-        </div>
+
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Additional Options</h2>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Max Performers
+                </label>
+                <input
+                  type="number"
+                  value={event.maxCapacity}
+                  onChange={(e) => setEvent({ ...event, maxCapacity: e.target.value })}
+                  placeholder="Leave empty for unlimited"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Signup Deadline
+                </label>
+                <input
+                  type="datetime-local"
+                  value={event.signupDeadline}
+                  onChange={(e) => setEvent({ ...event, signupDeadline: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={event.houseband}
+                  onChange={(e) => setEvent({ ...event, houseband: e.target.checked })}
+                  style={{ marginRight: '0.5rem' }}
+                />
+                <span style={{ fontWeight: '500' }}>House band available to accompany performers</span>
+              </label>
+            </div>
+
+            {event.houseband && (
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Songs the house band knows
+                </label>
+                
+                <div style={{ display: 'flex', marginBottom: '1rem' }}>
+                  <input
+                    type="text"
+                    placeholder="Add a song..."
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addSong((e.target as HTMLInputElement).value)
+                        ;(e.target as HTMLInputElement).value = ''
+                      }
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem 0 0 0.375rem',
+                      fontSize: '1rem'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                      addSong(input.value)
+                      input.value = ''
+                    }}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '0 0.375rem 0.375rem 0',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Add
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {event.housebandSongs.map(song => (
+                    <span
+                      key={song}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        padding: '0.25rem 0.75rem',
+                        backgroundColor: '#dbeafe',
+                        color: '#1e40af',
+                        borderRadius: '9999px',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      {song}
+                      <button
+                        type="button"
+                        onClick={() => removeSong(song)}
+                        style={{
+                          marginLeft: '0.5rem',
+                          background: 'none',
+                          border: 'none',
+                          color: '#1e40af',
+                          cursor: 'pointer',
+                          fontSize: '1rem'
+                        }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {message && (
+            <div style={{
+              padding: '1rem',
+              borderRadius: '0.375rem',
+              marginBottom: '1rem',
+              backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
+              color: message.includes('success') ? '#065f46' : '#991b1b'
+            }}>
+              {message}
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
+                color: 'white',
+                padding: '0.75rem 2rem',
+                borderRadius: '0.375rem',
+                border: 'none',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isLoading ? 'Creating...' : 'Create Event'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

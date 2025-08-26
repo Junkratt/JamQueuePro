@@ -1,41 +1,231 @@
 'use client'
 
-import { useSession, signIn, signOut } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 export default function Navigation() {
   const { data: session, status } = useSession()
+  const pathname = usePathname()
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  return (
-    <nav className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <Link href="/" className="text-xl font-bold text-gray-900">
+  const isActivePath = (path: string) => {
+    if (path === '/dashboard' && pathname === '/dashboard') return true
+    if (path !== '/dashboard' && pathname.startsWith(path)) return true
+    return false
+  }
+
+  if (status === 'loading') {
+    return (
+      <nav style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', padding: '1rem' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Link href="/" style={{ fontSize: '1.5rem', fontWeight: 'bold', textDecoration: 'none', color: '#1f2937' }}>
             Jam Queue Pro
           </Link>
-          
-          <div className="flex items-center space-x-4">
-            {status === 'loading' ? (
-              <span className="text-gray-600">Loading...</span>
-            ) : session ? (
-              <div className="flex items-center space-x-4">
-                <span className="text-gray-700">
-                  Welcome, {session.user?.name || session.user?.email}
+          <div>Loading...</div>
+        </div>
+      </nav>
+    )
+  }
+
+  const navLinks = session ? [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/events', label: 'Jam Sessions' },
+    { href: '/venues/search', label: 'Find Venues' },
+    { href: '/profile', label: 'Profile' },
+  ] : []
+
+  const ownerLinks = session ? [
+    { href: '/venues/register', label: 'Register Venue' },
+    { href: '/events/create', label: 'Create Event' },
+  ] : []
+
+  return (
+    <nav style={{ backgroundColor: 'white', borderBottom: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', height: '4rem' }}>
+          {/* Logo */}
+          <Link 
+            href="/" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              textDecoration: 'none', 
+              color: '#1f2937',
+              fontWeight: 'bold',
+              fontSize: '1.25rem'
+            }}
+          >
+            <div style={{
+              width: '2rem',
+              height: '2rem',
+              backgroundColor: '#2563eb',
+              borderRadius: '0.375rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: '0.5rem'
+            }}>
+              <span style={{ color: 'white', fontWeight: 'bold', fontSize: '0.875rem' }}>JQ</span>
+            </div>
+            Jam Queue Pro
+          </Link>
+
+          {/* Desktop navigation */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+            {navLinks.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                style={{
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.375rem',
+                  textDecoration: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s',
+                  ...(isActivePath(link.href)
+                    ? { backgroundColor: '#dbeafe', color: '#1d4ed8' }
+                    : { color: '#6b7280' })
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActivePath(link.href)) {
+                    e.currentTarget.style.backgroundColor = '#f3f4f6'
+                    e.currentTarget.style.color = '#1f2937'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActivePath(link.href)) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = '#6b7280'
+                  }
+                }}
+              >
+                {link.label}
+              </Link>
+            ))}
+            
+            {session && (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  style={{
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    color: '#6b7280',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f3f4f6'
+                    e.currentTarget.style.color = '#1f2937'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.color = '#6b7280'
+                  }}
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                >
+                  Venue Owner ▾
+                </button>
+                
+                {isMobileMenuOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: '0.25rem',
+                    width: '12rem',
+                    backgroundColor: 'white',
+                    borderRadius: '0.375rem',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e5e7eb',
+                    zIndex: 10
+                  }}>
+                    <div style={{ padding: '0.5rem' }}>
+                      {ownerLinks.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          style={{
+                            display: 'block',
+                            padding: '0.5rem 0.75rem',
+                            borderRadius: '0.25rem',
+                            textDecoration: 'none',
+                            color: '#374151',
+                            fontSize: '0.875rem'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#f3f4f6'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* User menu */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            {session ? (
+              <>
+                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  Welcome, {session.user?.name?.split(' ')[0] || session.user?.email}
                 </span>
                 <button
-                  onClick={() => signOut()}
-                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
+                  onClick={() => signOut({ callbackUrl: '/' })}
+                  style={{
+                    backgroundColor: '#dc2626',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    border: 'none',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#b91c1c'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#dc2626'
+                  }}
                 >
                   Sign Out
                 </button>
-              </div>
+              </>
             ) : (
-              <button
-                onClick={() => signIn()}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm"
+              <Link
+                href="/auth/signin"
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.375rem',
+                  textDecoration: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1d4ed8'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2563eb'
+                }}
               >
                 Sign In
-              </button>
+              </Link>
             )}
           </div>
         </div>

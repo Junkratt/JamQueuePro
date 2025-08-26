@@ -10,7 +10,7 @@ const prisma = new PrismaClient()
 const createTransporter = () => {
   if (process.env.NODE_ENV === 'production') {
     // Production email configuration
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       host: process.env.EMAIL_HOST,
       port: parseInt(process.env.EMAIL_PORT || '587'),
       secure: process.env.EMAIL_SECURE === 'true',
@@ -21,7 +21,7 @@ const createTransporter = () => {
     })
   } else {
     // Development - log emails to console
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       streamTransport: true,
       newline: 'unix',
       buffer: true

@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
     
     const createTransporter = () => {
       if (process.env.NODE_ENV === 'production') {
-        return nodemailer.createTransporter({
+        return nodemailer.createTransport({
           host: process.env.EMAIL_HOST,
           port: parseInt(process.env.EMAIL_PORT || '587'),
           secure: process.env.EMAIL_SECURE === 'true',
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
           }
         })
       } else {
-        return nodemailer.createTransporter({
+        return nodemailer.createTransport({
           streamTransport: true,
           newline: 'unix',
           buffer: true

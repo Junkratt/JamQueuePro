@@ -74,6 +74,12 @@ export default function Dashboard() {
                 >
                   Browse Jam Sessions
                 </Link>
+                <Link 
+                  href="/venues/search"
+                  className="block w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-md text-purple-700 transition-colors"
+                >
+                  Find Local Venues
+                </Link>
                 <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
                   Find Musicians (Coming Soon)
                 </button>

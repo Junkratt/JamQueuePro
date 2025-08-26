@@ -86,6 +86,12 @@ export default function Dashboard() {
                 >
                   Register Your Venue
                 </Link>
+                <Link 
+                  href="/events/create"
+                  className="block w-full text-left px-4 py-3 bg-purple-50 hover:bg-purple-100 rounded-md text-purple-700 transition-colors"
+                >
+                  Create Jam Session
+                </Link>
                 <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
                   Manage Events (Coming Soon)
                 </button>

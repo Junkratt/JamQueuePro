@@ -3,6 +3,7 @@
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import Navigation from '../components/Navigation'
 
 export default function Profile() {
   const { data: session, status } = useSession()
@@ -27,13 +28,29 @@ export default function Profile() {
       return
     }
 
-    // Set initial profile data from session
-    setProfile(prev => ({
-      ...prev,
-      name: session.user?.name || '',
-      email: session.user?.email || ''
-    }))
+    fetchProfile()
   }, [session, status, router])
+
+  const fetchProfile = async () => {
+    try {
+      const response = await fetch('/api/user/profile')
+      if (response.ok) {
+        const userData = await response.json()
+        setProfile({
+          name: userData.name || '',
+          nickname: userData.nickname || '',
+          email: userData.email || '',
+          location: userData.location || '',
+          instruments: userData.instruments || [],
+          musicPrefs: userData.musicPrefs || [],
+          experience: userData.experience || 'beginner',
+          bio: userData.bio || ''
+        })
+      }
+    } catch (error) {
+      console.error('Failed to load profile:', error)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,7 +58,6 @@ export default function Profile() {
     setMessage('')
 
     try {
-      // Include email in the request for now
       const profileWithEmail = {
         ...profile,
         email: session?.user?.email
@@ -59,13 +75,13 @@ export default function Profile() {
 
       if (response.ok) {
         setMessage('Profile updated successfully!')
+        // Refresh the profile data to show the changes
+        await fetchProfile()
       } else {
         setMessage(`Failed to update profile: ${data.error || 'Unknown error'}`)
-        console.error('API Error:', data)
       }
     } catch (error) {
       setMessage('Network error. Please try again.')
-      console.error('Network error:', error)
     } finally {
       setIsLoading(false)
     }
@@ -104,7 +120,11 @@ export default function Profile() {
   }
 
   if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        Loading...
+      </div>
+    )
   }
 
   if (!session) return null
@@ -120,214 +140,306 @@ export default function Profile() {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-xl font-bold text-gray-900">Profile</h1>
-            </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <Navigation />
+
+      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
+          Musician Profile
+        </h1>
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Basic Information</h2>
             
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => router.push('/dashboard')}
-                className="text-gray-600 hover:text-gray-900"
-              >
-                Dashboard
-              </button>
-              <span className="text-gray-700">
-                {session.user?.name}
-              </span>
-              <button
-                onClick={() => signOut({ callbackUrl: '/' })}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm"
-              >
-                Sign Out
-              </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={profile.name}
+                  onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Nickname (Stage Name)
+                </label>
+                <input
+                  type="text"
+                  value={profile.nickname}
+                  onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={session.user?.email || ''}
+                  disabled
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    backgroundColor: '#f9fafb',
+                    cursor: 'not-allowed',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={profile.location}
+                  onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                  placeholder="City, State"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Experience Level
+                </label>
+                <select
+                  value={profile.experience}
+                  onChange={(e) => setProfile({ ...profile, experience: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                >
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate">Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                </select>
+              </div>
             </div>
           </div>
-        </div>
-      </nav>
 
-      <div className="py-12 px-4">
-        <div className="max-w-2xl mx-auto">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Basic Information</h2>
-              
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.name}
-                    onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nickname (Stage Name)
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.nickname}
-                    onChange={(e) => setProfile({ ...profile, nickname: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={session.user?.email || ''}
-                    disabled
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Location
-                  </label>
-                  <input
-                    type="text"
-                    value={profile.location}
-                    onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                    placeholder="City, State"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Experience Level
-                  </label>
-                  <select
-                    value={profile.experience}
-                    onChange={(e) => setProfile({ ...profile, experience: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Instruments</h2>
-              
-              <div className="mb-4">
-                <select
-                  onChange={(e) => {
-                    addInstrument(e.target.value)
-                    e.target.value = ''
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Add an instrument...</option>
-                  {instrumentOptions.map(instrument => (
-                    <option key={instrument} value={instrument}>{instrument}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {profile.instruments.map(instrument => (
-                  <span
-                    key={instrument}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800"
-                  >
-                    {instrument}
-                    <button
-                      type="button"
-                      onClick={() => removeInstrument(instrument)}
-                      className="ml-2 text-blue-600 hover:text-blue-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Music Preferences</h2>
-              
-              <div className="mb-4">
-                <select
-                  onChange={(e) => {
-                    addMusicPref(e.target.value)
-                    e.target.value = ''
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Add a genre...</option>
-                  {genreOptions.map(genre => (
-                    <option key={genre} value={genre}>{genre}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {profile.musicPrefs.map(genre => (
-                  <span
-                    key={genre}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-green-100 text-green-800"
-                  >
-                    {genre}
-                    <button
-                      type="button"
-                      onClick={() => removeMusicPref(genre)}
-                      className="ml-2 text-green-600 hover:text-green-800"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Bio</h2>
-              <textarea
-                value={profile.bio}
-                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                placeholder="Tell other musicians about yourself..."
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-
-            {message && (
-              <div className={`rounded-md p-4 ${
-                message.includes('success') 
-                  ? 'bg-green-50 text-green-800' 
-                  : 'bg-red-50 text-red-800'
-              }`}>
-                {message}
-              </div>
-            )}
-
-            <div className="text-center">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-md font-medium disabled:opacity-50"
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Instruments</h2>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <select
+                onChange={(e) => {
+                  addInstrument(e.target.value)
+                  e.target.value = ''
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '1rem'
+                }}
               >
-                {isLoading ? 'Saving...' : 'Save Profile'}
-              </button>
+                <option value="">Add an instrument...</option>
+                {instrumentOptions.map(instrument => (
+                  <option key={instrument} value={instrument}>{instrument}</option>
+                ))}
+              </select>
             </div>
-          </form>
-        </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {profile.instruments.map(instrument => (
+                <span
+                  key={instrument}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0.25rem 0.75rem',
+                    backgroundColor: '#dbeafe',
+                    color: '#1e40af',
+                    borderRadius: '9999px',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {instrument}
+                  <button
+                    type="button"
+                    onClick={() => removeInstrument(instrument)}
+                    style={{
+                      marginLeft: '0.5rem',
+                      background: 'none',
+                      border: 'none',
+                      color: '#1e40af',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Music Preferences</h2>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <select
+                onChange={(e) => {
+                  addMusicPref(e.target.value)
+                  e.target.value = ''
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '0.375rem',
+                  fontSize: '1rem'
+                }}
+              >
+                <option value="">Add a genre...</option>
+                {genreOptions.map(genre => (
+                  <option key={genre} value={genre}>{genre}</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {profile.musicPrefs.map(genre => (
+                <span
+                  key={genre}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '0.25rem 0.75rem',
+                    backgroundColor: '#d1fae5',
+                    color: '#065f46',
+                    borderRadius: '9999px',
+                    fontSize: '0.875rem'
+                  }}
+                >
+                  {genre}
+                  <button
+                    type="button"
+                    onClick={() => removeMusicPref(genre)}
+                    style={{
+                      marginLeft: '0.5rem',
+                      background: 'none',
+                      border: 'none',
+                      color: '#065f46',
+                      cursor: 'pointer',
+                      fontSize: '1rem'
+                    }}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            marginBottom: '2rem',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+          }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Bio</h2>
+            <textarea
+              value={profile.bio}
+              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+              placeholder="Tell other musicians about yourself..."
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                resize: 'vertical'
+              }}
+            />
+          </div>
+
+          {message && (
+            <div style={{
+              padding: '1rem',
+              borderRadius: '0.375rem',
+              marginBottom: '1rem',
+              backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
+              color: message.includes('success') ? '#065f46' : '#991b1b'
+            }}>
+              {message}
+            </div>
+          )}
+
+          <div style={{ textAlign: 'center' }}>
+            <button
+              type="submit"
+              disabled={isLoading}
+              style={{
+                backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
+                color: 'white',
+                padding: '0.75rem 2rem',
+                borderRadius: '0.375rem',
+                border: 'none',
+                fontSize: '1rem',
+                fontWeight: '500',
+                cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isLoading ? 'Saving...' : 'Save Profile'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Create the venue
+    // Create the venue - remove ownerId for now until schema is updated
     const venue = await prisma.venue.create({
       data: {
         name: data.name,
@@ -29,12 +29,12 @@ export async function POST(request: NextRequest) {
         state: data.state,
         zipCode: data.zipCode,
         email: data.email,
-        phone: data.phone,
-        website: data.website,
-        description: data.description,
-        capacity: data.capacity,
-        amenities: data.amenities,
-        ownerId: owner.id
+        phone: data.phone || null,
+        website: data.website || null,
+        description: data.description || null,
+        capacity: data.capacity || null,
+        amenities: data.amenities || []
+        // ownerId: owner.id  // Remove this line temporarily
       }
     })
 
@@ -51,19 +51,6 @@ export async function POST(request: NextRequest) {
 export async function GET() {
   try {
     const venues = await prisma.venue.findMany({
-      include: {
-        owner: {
-          select: {
-            name: true,
-            email: true
-          }
-        },
-        _count: {
-          select: {
-            events: true
-          }
-        }
-      },
       orderBy: {
         createdAt: 'desc'
       }

@@ -68,9 +68,12 @@ export default function Dashboard() {
                 >
                   Update Your Profile
                 </Link>
-                <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
-                  Browse Jam Sessions (Coming Soon)
-                </button>
+                <Link 
+                  href="/events"
+                  className="block w-full text-left px-4 py-3 bg-green-50 hover:bg-green-100 rounded-md text-green-700 transition-colors"
+                >
+                  Browse Jam Sessions
+                </Link>
                 <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
                   Find Musicians (Coming Soon)
                 </button>

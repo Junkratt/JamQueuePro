@@ -1,50 +1,89 @@
-import NextAuth from 'next-auth'
+import NextAuth, { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import FacebookProvider from 'next-auth/providers/facebook'
+import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-const handler = NextAuth({
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: 'credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
-        name: { label: 'Name', type: 'text' }
+        password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        if (!credentials?.email) return null
-        
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
         try {
-          let user = await prisma.user.findUnique({
+          // Find user by email
+          const user = await prisma.user.findUnique({
             where: { email: credentials.email }
           })
-          
-          if (!user) {
-            user = await prisma.user.create({
-              data: {
-                email: credentials.email,
-                name: credentials.name || ''
-              }
-            })
+
+          if (!user || !user.password) {
+            return null
           }
+
+          // Check if email is verified
+          if (!user.emailVerified) {
+            throw new Error('Please verify your email before signing in')
+          }
+
+          // Verify password
+          const isValid = await bcrypt.compare(credentials.password, user.password)
           
+          if (!isValid) {
+            return null
+          }
+
           return {
             id: user.id,
             email: user.email,
-            name: user.name
+            name: user.name,
+            image: user.profileImage
           }
         } catch (error) {
           console.error('Auth error:', error)
           return null
         }
       }
+    }),
+    // Facebook provider (for future use)
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_CLIENT_ID || '',
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || ''
     })
   ],
+  session: {
+    strategy: 'jwt'
+  },
   pages: {
     signIn: '/auth/signin',
+    signUp: '/auth/signup'
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id as string
+      }
+      return session
+    }
   },
   secret: process.env.NEXTAUTH_SECRET,
-})
+}
 
+const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }

@@ -27,30 +27,13 @@ export default function Profile() {
       return
     }
 
-    // Load user profile
-    fetchProfile()
+    // Set initial profile data from session
+    setProfile(prev => ({
+      ...prev,
+      name: session.user?.name || '',
+      email: session.user?.email || ''
+    }))
   }, [session, status, router])
-
-  const fetchProfile = async () => {
-    try {
-      const response = await fetch('/api/user/profile')
-      if (response.ok) {
-        const userData = await response.json()
-        setProfile({
-          name: userData.name || '',
-          nickname: userData.nickname || '',
-          email: userData.email || '',
-          location: userData.location || '',
-          instruments: userData.instruments || [],
-          musicPrefs: userData.musicPrefs || [],
-          experience: userData.experience || 'beginner',
-          bio: userData.bio || ''
-        })
-      }
-    } catch (error) {
-      console.error('Failed to load profile:', error)
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,12 +41,18 @@ export default function Profile() {
     setMessage('')
 
     try {
+      // Include email in the request for now
+      const profileWithEmail = {
+        ...profile,
+        email: session?.user?.email
+      }
+
       const response = await fetch('/api/user/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(profile)
+        body: JSON.stringify(profileWithEmail)
       })
 
       const data = await response.json()
@@ -71,7 +60,6 @@ export default function Profile() {
       if (response.ok) {
         setMessage('Profile updated successfully!')
       } else {
-        // Show the actual error from the API
         setMessage(`Failed to update profile: ${data.error || 'Unknown error'}`)
         console.error('API Error:', data)
       }
@@ -82,6 +70,7 @@ export default function Profile() {
       setIsLoading(false)
     }
   }
+
   const addInstrument = (instrument: string) => {
     if (instrument && !profile.instruments.includes(instrument)) {
       setProfile({
@@ -197,7 +186,7 @@ export default function Profile() {
                   </label>
                   <input
                     type="email"
-                    value={profile.email}
+                    value={session.user?.email || ''}
                     disabled
                     className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                   />

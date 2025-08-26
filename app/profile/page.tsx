@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navigation from '../components/Navigation'
@@ -75,7 +75,6 @@ export default function Profile() {
 
       if (response.ok) {
         setMessage('Profile updated successfully!')
-        // Refresh the profile data to show the changes
         await fetchProfile()
       } else {
         setMessage(`Failed to update profile: ${data.error || 'Unknown error'}`)
@@ -143,7 +142,7 @@ export default function Profile() {
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       <Navigation />
 
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
         <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
           Musician Profile
         </h1>
@@ -158,7 +157,7 @@ export default function Profile() {
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Basic Information</h2>
             
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
                   Full Name
@@ -234,7 +233,7 @@ export default function Profile() {
                 />
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
+              <div>
                 <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
                   Experience Level
                 </label>
@@ -266,26 +265,25 @@ export default function Profile() {
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Instruments</h2>
             
-            <div style={{ marginBottom: '1rem' }}>
-              <select
-                onChange={(e) => {
-                  addInstrument(e.target.value)
-                  e.target.value = ''
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value="">Add an instrument...</option>
-                {instrumentOptions.map(instrument => (
-                  <option key={instrument} value={instrument}>{instrument}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              onChange={(e) => {
+                addInstrument(e.target.value)
+                e.target.value = ''
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                marginBottom: '1rem'
+              }}
+            >
+              <option value="">Add an instrument...</option>
+              {instrumentOptions.map(instrument => (
+                <option key={instrument} value={instrument}>{instrument}</option>
+              ))}
+            </select>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {profile.instruments.map(instrument => (
@@ -294,7 +292,7 @@ export default function Profile() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '0.25rem 0.75rem',
+                    padding: '0.5rem 1rem',
                     backgroundColor: '#dbeafe',
                     color: '#1e40af',
                     borderRadius: '9999px',
@@ -311,7 +309,8 @@ export default function Profile() {
                       border: 'none',
                       color: '#1e40af',
                       cursor: 'pointer',
-                      fontSize: '1rem'
+                      fontSize: '1.2rem',
+                      lineHeight: 1
                     }}
                   >
                     ×
@@ -330,26 +329,25 @@ export default function Profile() {
           }}>
             <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Music Preferences</h2>
             
-            <div style={{ marginBottom: '1rem' }}>
-              <select
-                onChange={(e) => {
-                  addMusicPref(e.target.value)
-                  e.target.value = ''
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '1rem'
-                }}
-              >
-                <option value="">Add a genre...</option>
-                {genreOptions.map(genre => (
-                  <option key={genre} value={genre}>{genre}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              onChange={(e) => {
+                addMusicPref(e.target.value)
+                e.target.value = ''
+              }}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                marginBottom: '1rem'
+              }}
+            >
+              <option value="">Add a genre...</option>
+              {genreOptions.map(genre => (
+                <option key={genre} value={genre}>{genre}</option>
+              ))}
+            </select>
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
               {profile.musicPrefs.map(genre => (
@@ -358,7 +356,7 @@ export default function Profile() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    padding: '0.25rem 0.75rem',
+                    padding: '0.5rem 1rem',
                     backgroundColor: '#d1fae5',
                     color: '#065f46',
                     borderRadius: '9999px',
@@ -375,7 +373,8 @@ export default function Profile() {
                       border: 'none',
                       color: '#065f46',
                       cursor: 'pointer',
-                      fontSize: '1rem'
+                      fontSize: '1.2rem',
+                      lineHeight: 1
                     }}
                   >
                     ×
@@ -415,7 +414,8 @@ export default function Profile() {
               borderRadius: '0.375rem',
               marginBottom: '1rem',
               backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
-              color: message.includes('success') ? '#065f46' : '#991b1b'
+              color: message.includes('success') ? '#065f46' : '#991b1b',
+              textAlign: 'center'
             }}>
               {message}
             </div>
@@ -440,7 +440,7 @@ export default function Profile() {
             </button>
           </div>
         </form>
-      </div>
+      </main>
     </div>
   )
 }

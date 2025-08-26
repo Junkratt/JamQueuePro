@@ -60,7 +60,7 @@ export default function Dashboard() {
         <div className="max-w-4xl mx-auto">
           <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Quick Actions</h2>
+              <h2 className="text-xl font-bold mb-4">Musician Tools</h2>
               <div className="space-y-3">
                 <Link 
                   href="/profile"
@@ -69,18 +69,36 @@ export default function Dashboard() {
                   Update Your Profile
                 </Link>
                 <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
-                  Find Local Venues (Coming Soon)
+                  Browse Jam Sessions (Coming Soon)
                 </button>
                 <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
-                  Browse Jam Sessions (Coming Soon)
+                  Find Musicians (Coming Soon)
                 </button>
               </div>
             </div>
 
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
-              <p className="text-gray-600">No recent activity yet. Complete your profile to get started!</p>
+              <h2 className="text-xl font-bold mb-4">Venue Owner Tools</h2>
+              <div className="space-y-3">
+                <Link 
+                  href="/venues/register"
+                  className="block w-full text-left px-4 py-3 bg-green-50 hover:bg-green-100 rounded-md text-green-700 transition-colors"
+                >
+                  Register Your Venue
+                </Link>
+                <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
+                  Manage Events (Coming Soon)
+                </button>
+                <button className="block w-full text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-md text-gray-700 transition-colors">
+                  View Analytics (Coming Soon)
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="mt-8 bg-white rounded-lg shadow-md p-6">
+            <h2 className="text-xl font-bold mb-4">Recent Activity</h2>
+            <p className="text-gray-600">No recent activity yet. Complete your profile or register a venue to get started!</p>
           </div>
         </div>
       </div>

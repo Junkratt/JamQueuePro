@@ -109,10 +109,9 @@ export async function POST(request: NextRequest) {
           }
         })
       } else {
+        // Development - use jsonTransport instead of streamTransport
         return nodemailer.createTransport({
-          streamTransport: true,
-          newline: 'unix',
-          buffer: true
+          jsonTransport: true
         })
       }
     }
@@ -149,24 +148,15 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      await transporter.sendMail(mailOptions)
+      const info = await transporter.sendMail(mailOptions)
       if (process.env.NODE_ENV !== 'production') {
         console.log('Verification email resent to:', email)
         console.log('Verification URL:', verificationUrl)
+        // For jsonTransport, the message is in info.message
+        if (info.message) {
+          console.log('Email content (JSON):', JSON.parse(info.message.toString()))
+        }
       }
     } catch (error) {
       console.error('Failed to send verification email:', error)
     }
-
-    return NextResponse.json({
-      message: 'Verification email sent. Please check your email.'
-    })
-
-  } catch (error) {
-    console.error('Resend verification error:', error)
-    return NextResponse.json(
-      { error: 'Failed to resend verification email' },
-      { status: 500 }
-    )
-  }
-}

@@ -20,11 +20,9 @@ const createTransporter = () => {
       }
     })
   } else {
-    // Development - log emails to console
+    // Development - use console logging instead of streamTransport
     return nodemailer.createTransport({
-      streamTransport: true,
-      newline: 'unix',
-      buffer: true
+      jsonTransport: true
     })
   }
 }
@@ -71,7 +69,10 @@ async function sendVerificationEmail(email: string, token: string) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Verification email would be sent to:', email)
       console.log('Verification URL:', verificationUrl)
-      console.log('Email content:', info.message.toString())
+      // For jsonTransport, the message is in info.message
+      if (info.message) {
+        console.log('Email content (JSON):', JSON.parse(info.message.toString()))
+      }
     }
     return true
   } catch (error) {

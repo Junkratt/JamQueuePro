@@ -94,7 +94,6 @@ export async function POST(request: NextRequest) {
     })
 
     // Send verification email (reuse the function from register route)
-    // You might want to extract this to a shared utility
     const nodemailer = require('nodemailer')
     
     const createTransporter = () => {
@@ -109,7 +108,6 @@ export async function POST(request: NextRequest) {
           }
         })
       } else {
-        // Development - use jsonTransport instead of streamTransport
         return nodemailer.createTransport({
           jsonTransport: true
         })
@@ -152,7 +150,6 @@ export async function POST(request: NextRequest) {
       if (process.env.NODE_ENV !== 'production') {
         console.log('Verification email resent to:', email)
         console.log('Verification URL:', verificationUrl)
-        // For jsonTransport, the message is in info.message
         if (info.message) {
           console.log('Email content (JSON):', JSON.parse(info.message.toString()))
         }
@@ -160,3 +157,16 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       console.error('Failed to send verification email:', error)
     }
+
+    return NextResponse.json({
+      message: 'Verification email sent. Please check your email.'
+    })
+
+  } catch (error) {
+    console.error('Resend verification error:', error)
+    return NextResponse.json(
+      { error: 'Failed to resend verification email' },
+      { status: 500 }
+    )
+  }
+}

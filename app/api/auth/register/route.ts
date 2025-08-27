@@ -20,7 +20,7 @@ const createTransporter = () => {
       }
     })
   } else {
-    // Development - use console logging instead of streamTransport
+    // Development - use jsonTransport instead of streamTransport
     return nodemailer.createTransport({
       jsonTransport: true
     })
@@ -69,7 +69,6 @@ async function sendVerificationEmail(email: string, token: string) {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Verification email would be sent to:', email)
       console.log('Verification URL:', verificationUrl)
-      // For jsonTransport, the message is in info.message
       if (info.message) {
         console.log('Email content (JSON):', JSON.parse(info.message.toString()))
       }

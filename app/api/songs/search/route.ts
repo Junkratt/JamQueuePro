@@ -58,6 +58,10 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Song search error:', error)
     
+    // Get query from the outer scope for fallback
+    const { searchParams } = new URL(request.url)
+    const queryForFallback = searchParams.get('q')?.trim() || ''
+    
     // Fallback to a basic popular songs list if iTunes fails
     const fallbackSongs = [
       { title: "Sweet Child O' Mine", artist: "Guns N' Roses", genre: "Rock" },
@@ -69,8 +73,8 @@ export async function GET(request: NextRequest) {
       { title: "Sweet Caroline", artist: "Neil Diamond", genre: "Pop" },
       { title: "Livin' on a Prayer", artist: "Bon Jovi", genre: "Rock" }
     ].filter(song => 
-      song.title.toLowerCase().includes(query.toLowerCase()) ||
-      song.artist.toLowerCase().includes(query.toLowerCase())
+      song.title.toLowerCase().includes(queryForFallback.toLowerCase()) ||
+      song.artist.toLowerCase().includes(queryForFallback.toLowerCase())
     )
 
     return Response.json(fallbackSongs)

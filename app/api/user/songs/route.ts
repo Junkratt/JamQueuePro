@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import crypto from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userEmail, title, artist, genre, key, proficiency } = await request.json()
+    const { userEmail, title, artist, genre, key, proficiency, album, year } = await request.json()
 
     if (!userEmail || !title || !artist) {
       return Response.json({ error: 'Email, title, and artist are required' }, { status: 400 })
@@ -57,18 +58,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create or find song
-    let song = await prisma.song.findUnique({
+    let song = await prisma.song.findFirst({
       where: {
-        title_artist: {
-          title: title.trim(),
-          artist: artist.trim()
-        }
+        AND: [
+          { title: { equals: title.trim(), mode: 'insensitive' } },
+          { artist: { equals: artist.trim(), mode: 'insensitive' } }
+        ]
       }
     })
 
     if (!song) {
       song = await prisma.song.create({
         data: {
+          id: crypto.randomUUID(),
           title: title.trim(),
           artist: artist.trim(),
           genre: genre || null,
@@ -78,12 +80,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already knows this song
-    const existingUserSong = await prisma.userSong.findUnique({
+    const existingUserSong = await prisma.userSong.findFirst({
       where: {
-        userId_songId: {
-          userId: user.id,
-          songId: song.id
-        }
+        userId: user.id,
+        songId: song.id
       }
     })
 
@@ -94,6 +94,7 @@ export async function POST(request: NextRequest) {
     // Add song to user's library
     const userSong = await prisma.userSong.create({
       data: {
+        id: crypto.randomUUID(),
         userId: user.id,
         songId: song.id,
         proficiency: proficiency || 'comfortable'

@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navigation from '../components/Navigation'
+import Link from 'next/link'
 
 export default function Profile() {
   const { data: session, status } = useSession()
@@ -16,10 +17,13 @@ export default function Profile() {
     instruments: [] as string[],
     musicPrefs: [] as string[],
     experience: 'beginner',
-    bio: ''
+    bio: '',
+    profileImage: ''
   })
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [songCount, setSongCount] = useState(0)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -29,6 +33,7 @@ export default function Profile() {
     }
 
     fetchProfile()
+    fetchSongCount()
   }, [session, status, router])
 
   const fetchProfile = async () => {
@@ -44,11 +49,74 @@ export default function Profile() {
           instruments: userData.instruments || [],
           musicPrefs: userData.musicPrefs || [],
           experience: userData.experience || 'beginner',
-          bio: userData.bio || ''
+          bio: userData.bio || '',
+          profileImage: userData.profileImage || ''
         })
       }
     } catch (error) {
       console.error('Failed to load profile:', error)
+    }
+  }
+
+  const fetchSongCount = async () => {
+    try {
+      const response = await fetch(`/api/user/songs?email=${session?.user?.email}`)
+      if (response.ok) {
+        const songs = await response.json()
+        setSongCount(songs.length)
+      }
+    } catch (error) {
+      console.error('Failed to load song count:', error)
+    }
+  }
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Check file size (limit to 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setMessage('Photo must be smaller than 2MB')
+      return
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      setMessage('Please select a valid image file')
+      return
+    }
+
+    setPhotoUploading(true)
+    setMessage('')
+
+    try {
+      const reader = new FileReader()
+      reader.onload = async (event) => {
+        const photoData = event.target?.result as string
+
+        const response = await fetch('/api/user/photo', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: session?.user?.email,
+            photoData
+          })
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          setProfile({ ...profile, profileImage: data.profileImage })
+          setMessage('Photo uploaded successfully!')
+        } else {
+          setMessage(data.error || 'Failed to upload photo')
+        }
+        setPhotoUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch (error) {
+      setMessage('Failed to upload photo')
+      setPhotoUploading(false)
     }
   }
 
@@ -147,6 +215,113 @@ export default function Profile() {
           Musician Profile
         </h1>
 
+        {/* Profile Overview */}
+        <div style={{ 
+          backgroundColor: 'white', 
+          padding: '2rem', 
+          borderRadius: '0.5rem', 
+          marginBottom: '2rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          display: 'grid',
+          gridTemplateColumns: 'auto 1fr auto',
+          gap: '2rem',
+          alignItems: 'center'
+        }}>
+          {/* Profile Photo */}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width: '120px',
+              height: '120px',
+              borderRadius: '50%',
+              border: '3px solid #e5e7eb',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              backgroundColor: '#f3f4f6',
+              marginBottom: '1rem'
+            }}>
+              {profile.profileImage ? (
+                <img
+                  src={profile.profileImage}
+                  alt="Profile"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span style={{ fontSize: '3rem', color: '#9ca3af' }}>👤</span>
+              )}
+            </div>
+            <label style={{ 
+              display: 'inline-block',
+              padding: '0.5rem 1rem',
+              backgroundColor: '#2563eb',
+              color: 'white',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem'
+            }}>
+              {photoUploading ? 'Uploading...' : 'Change Photo'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                disabled={photoUploading}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
+
+          {/* Profile Summary */}
+          <div>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+              {profile.nickname || profile.name || 'Unnamed Musician'}
+            </h2>
+            {profile.nickname && profile.name && (
+              <p style={{ color: '#6b7280', marginBottom: '0.5rem' }}>({profile.name})</p>
+            )}
+            {profile.location && (
+              <p style={{ color: '#6b7280', marginBottom: '0.5rem' }}>📍 {profile.location}</p>
+            )}
+            <div style={{ display: 'flex', gap: '1rem', fontSize: '0.875rem', color: '#6b7280' }}>
+              <span>🎵 {songCount} songs</span>
+              <span>🎸 {profile.instruments.length} instruments</span>
+              <span>📊 {profile.experience}</span>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <Link
+              href="/profile/songs"
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: '#10b981',
+                color: 'white',
+                borderRadius: '0.375rem',
+                textDecoration: 'none',
+                textAlign: 'center',
+                fontSize: '0.875rem'
+              }}
+            >
+              Manage Songs ({songCount})
+            </Link>
+            <Link
+              href="/events"
+              style={{
+                padding: '0.75rem 1rem',
+                backgroundColor: '#6b7280',
+                color: 'white',
+                borderRadius: '0.375rem',
+                textDecoration: 'none',
+                textAlign: 'center',
+                fontSize: '0.875rem'
+              }}
+            >
+              Find Jam Sessions
+            </Link>
+          </div>
+        </div>
+
         <form onSubmit={handleSubmit}>
           <div style={{ 
             backgroundColor: 'white', 
@@ -196,251 +371,251 @@ export default function Profile() {
 
               <div>
                 <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Email
-                </label>
-                <input
-                  type="email"
-                  value={session.user?.email || ''}
-                  disabled
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    backgroundColor: '#f9fafb',
-                    cursor: 'not-allowed',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
+                 Email
+               </label>
+               <input
+                 type="email"
+                 value={session.user?.email || ''}
+                 disabled
+                 style={{
+                   width: '100%',
+                   padding: '0.75rem',
+                   border: '1px solid #d1d5db',
+                   borderRadius: '0.375rem',
+                   backgroundColor: '#f9fafb',
+                   cursor: 'not-allowed',
+                   fontSize: '1rem'
+                 }}
+               />
+             </div>
 
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={profile.location}
-                  onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                  placeholder="City, State"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
+             <div>
+               <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                 Location
+               </label>
+               <input
+                 type="text"
+                 value={profile.location}
+                 onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                 placeholder="City, State"
+                 style={{
+                   width: '100%',
+                   padding: '0.75rem',
+                   border: '1px solid #d1d5db',
+                   borderRadius: '0.375rem',
+                   fontSize: '1rem'
+                 }}
+               />
+             </div>
 
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Experience Level
-                </label>
-                <select
-                  value={profile.experience}
-                  onChange={(e) => setProfile({ ...profile, experience: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </select>
-              </div>
-            </div>
-          </div>
+             <div>
+               <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                 Experience Level
+               </label>
+               <select
+                 value={profile.experience}
+                 onChange={(e) => setProfile({ ...profile, experience: e.target.value })}
+                 style={{
+                   width: '100%',
+                   padding: '0.75rem',
+                   border: '1px solid #d1d5db',
+                   borderRadius: '0.375rem',
+                   fontSize: '1rem'
+                 }}
+               >
+                 <option value="beginner">Beginner</option>
+                 <option value="intermediate">Intermediate</option>
+                 <option value="advanced">Advanced</option>
+               </select>
+             </div>
+           </div>
+         </div>
 
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Instruments</h2>
-            
-            <select
-              onChange={(e) => {
-                addInstrument(e.target.value)
-                e.target.value = ''
-              }}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '1rem',
-                marginBottom: '1rem'
-              }}
-            >
-              <option value="">Add an instrument...</option>
-              {instrumentOptions.map(instrument => (
-                <option key={instrument} value={instrument}>{instrument}</option>
-              ))}
-            </select>
+         <div style={{ 
+           backgroundColor: 'white', 
+           padding: '2rem', 
+           borderRadius: '0.5rem', 
+           marginBottom: '2rem',
+           boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+         }}>
+           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Instruments</h2>
+           
+           <select
+             onChange={(e) => {
+               addInstrument(e.target.value)
+               e.target.value = ''
+             }}
+             style={{
+               width: '100%',
+               padding: '0.75rem',
+               border: '1px solid #d1d5db',
+               borderRadius: '0.375rem',
+               fontSize: '1rem',
+               marginBottom: '1rem'
+             }}
+           >
+             <option value="">Add an instrument...</option>
+             {instrumentOptions.map(instrument => (
+               <option key={instrument} value={instrument}>{instrument}</option>
+             ))}
+           </select>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {profile.instruments.map(instrument => (
-                <span
-                  key={instrument}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#dbeafe',
-                    color: '#1e40af',
-                    borderRadius: '9999px',
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {instrument}
-                  <button
-                    type="button"
-                    onClick={() => removeInstrument(instrument)}
-                    style={{
-                      marginLeft: '0.5rem',
-                      background: 'none',
-                      border: 'none',
-                      color: '#1e40af',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      lineHeight: 1
-                    }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+             {profile.instruments.map(instrument => (
+               <span
+                 key={instrument}
+                 style={{
+                   display: 'inline-flex',
+                   alignItems: 'center',
+                   padding: '0.5rem 1rem',
+                   backgroundColor: '#dbeafe',
+                   color: '#1e40af',
+                   borderRadius: '9999px',
+                   fontSize: '0.875rem'
+                 }}
+               >
+                 {instrument}
+                 <button
+                   type="button"
+                   onClick={() => removeInstrument(instrument)}
+                   style={{
+                     marginLeft: '0.5rem',
+                     background: 'none',
+                     border: 'none',
+                     color: '#1e40af',
+                     cursor: 'pointer',
+                     fontSize: '1.2rem',
+                     lineHeight: 1
+                   }}
+                 >
+                   ×
+                 </button>
+               </span>
+             ))}
+           </div>
+         </div>
 
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Music Preferences</h2>
-            
-            <select
-              onChange={(e) => {
-                addMusicPref(e.target.value)
-                e.target.value = ''
-              }}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '1rem',
-                marginBottom: '1rem'
-              }}
-            >
-              <option value="">Add a genre...</option>
-              {genreOptions.map(genre => (
-                <option key={genre} value={genre}>{genre}</option>
-              ))}
-            </select>
+         <div style={{ 
+           backgroundColor: 'white', 
+           padding: '2rem', 
+           borderRadius: '0.5rem', 
+           marginBottom: '2rem',
+           boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+         }}>
+           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Music Preferences</h2>
+           
+           <select
+             onChange={(e) => {
+               addMusicPref(e.target.value)
+               e.target.value = ''
+             }}
+             style={{
+               width: '100%',
+               padding: '0.75rem',
+               border: '1px solid #d1d5db',
+               borderRadius: '0.375rem',
+               fontSize: '1rem',
+               marginBottom: '1rem'
+             }}
+           >
+             <option value="">Add a genre...</option>
+             {genreOptions.map(genre => (
+               <option key={genre} value={genre}>{genre}</option>
+             ))}
+           </select>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-              {profile.musicPrefs.map(genre => (
-                <span
-                  key={genre}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#d1fae5',
-                    color: '#065f46',
-                    borderRadius: '9999px',
-                    fontSize: '0.875rem'
-                  }}
-                >
-                  {genre}
-                  <button
-                    type="button"
-                    onClick={() => removeMusicPref(genre)}
-                    style={{
-                      marginLeft: '0.5rem',
-                      background: 'none',
-                      border: 'none',
-                      color: '#065f46',
-                      cursor: 'pointer',
-                      fontSize: '1.2rem',
-                      lineHeight: 1
-                    }}
-                  >
-                    ×
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
+           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+             {profile.musicPrefs.map(genre => (
+               <span
+                 key={genre}
+                 style={{
+                   display: 'inline-flex',
+                   alignItems: 'center',
+                   padding: '0.5rem 1rem',
+                   backgroundColor: '#d1fae5',
+                   color: '#065f46',
+                   borderRadius: '9999px',
+                   fontSize: '0.875rem'
+                 }}
+               >
+                 {genre}
+                 <button
+                   type="button"
+                   onClick={() => removeMusicPref(genre)}
+                   style={{
+                     marginLeft: '0.5rem',
+                     background: 'none',
+                     border: 'none',
+                     color: '#065f46',
+                     cursor: 'pointer',
+                     fontSize: '1.2rem',
+                     lineHeight: 1
+                   }}
+                 >
+                   ×
+                 </button>
+               </span>
+             ))}
+           </div>
+         </div>
 
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Bio</h2>
-            <textarea
-              value={profile.bio}
-              onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-              placeholder="Tell other musicians about yourself..."
-              rows={4}
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                border: '1px solid #d1d5db',
-                borderRadius: '0.375rem',
-                fontSize: '1rem',
-                resize: 'vertical'
-              }}
-            />
-          </div>
+         <div style={{ 
+           backgroundColor: 'white', 
+           padding: '2rem', 
+           borderRadius: '0.5rem', 
+           marginBottom: '2rem',
+           boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+         }}>
+           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Bio</h2>
+           <textarea
+             value={profile.bio}
+             onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+             placeholder="Tell other musicians about yourself, your musical journey, what you're looking for..."
+             rows={4}
+             style={{
+               width: '100%',
+               padding: '0.75rem',
+               border: '1px solid #d1d5db',
+               borderRadius: '0.375rem',
+               fontSize: '1rem',
+               resize: 'vertical'
+             }}
+           />
+         </div>
 
-          {message && (
-            <div style={{
-              padding: '1rem',
-              borderRadius: '0.375rem',
-              marginBottom: '1rem',
-              backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
-              color: message.includes('success') ? '#065f46' : '#991b1b',
-              textAlign: 'center'
-            }}>
-              {message}
-            </div>
-          )}
+         {message && (
+           <div style={{
+             padding: '1rem',
+             borderRadius: '0.375rem',
+             marginBottom: '1rem',
+             backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
+             color: message.includes('success') ? '#065f46' : '#991b1b',
+             textAlign: 'center'
+           }}>
+             {message}
+           </div>
+         )}
 
-          <div style={{ textAlign: 'center' }}>
-            <button
-              type="submit"
-              disabled={isLoading}
-              style={{
-                backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
-                color: 'white',
-                padding: '0.75rem 2rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                fontSize: '1rem',
-                fontWeight: '500',
-                cursor: isLoading ? 'not-allowed' : 'pointer'
-              }}
-            >
-              {isLoading ? 'Saving...' : 'Save Profile'}
-            </button>
-          </div>
-        </form>
-      </main>
-    </div>
-  )
+         <div style={{ textAlign: 'center' }}>
+           <button
+             type="submit"
+             disabled={isLoading}
+             style={{
+               backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
+               color: 'white',
+               padding: '0.75rem 2rem',
+               borderRadius: '0.375rem',
+               border: 'none',
+               fontSize: '1rem',
+               fontWeight: '500',
+               cursor: isLoading ? 'not-allowed' : 'pointer'
+             }}
+           >
+             {isLoading ? 'Saving...' : 'Save Profile'}
+           </button>
+         </div>
+       </form>
+     </main>
+   </div>
+ )
 }

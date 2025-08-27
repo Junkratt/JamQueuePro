@@ -13,27 +13,53 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Email required' }, { status: 400 })
     }
 
+    // Check if tables exist first
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "Song" LIMIT 1`
+      await prisma.$queryRaw`SELECT 1 FROM "UserSong" LIMIT 1`
+    } catch (tableError) {
+      // Tables don't exist yet
+      return Response.json([])
+    }
+
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: {
-        knownSongs: {
-          include: {
-            song: true
-          },
-          orderBy: {
-            song: {
-              title: 'asc'
-            }
-          }
-        }
-      }
+      where: { email: userEmail }
     })
 
     if (!user) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
-    return Response.json(user.knownSongs)
+    // Get user songs using raw query to handle potential relation issues
+    const userSongs = await prisma.$queryRaw`
+      SELECT 
+        us.id,
+        us.proficiency,
+        s.id as song_id,
+        s.title,
+        s.artist,
+        s.genre,
+        s.key
+      FROM "UserSong" us
+      JOIN "Song" s ON us."songId" = s.id
+      WHERE us."userId" = ${user.id}
+      ORDER BY s.title ASC
+    `
+
+    // Transform to match expected format
+    const formattedSongs = (userSongs as any[]).map(row => ({
+      id: row.id,
+      proficiency: row.proficiency,
+      song: {
+        id: row.song_id,
+        title: row.title,
+        artist: row.artist,
+        genre: row.genre,
+        key: row.key
+      }
+    }))
+
+    return Response.json(formattedSongs)
   } catch (error) {
     console.error('Songs fetch error:', error)
     return Response.json({ error: 'Failed to fetch songs' }, { status: 500 })
@@ -42,10 +68,20 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userEmail, title, artist, genre, key, proficiency, album, year } = await request.json()
+    const { userEmail, title, artist, genre, key, proficiency } = await request.json()
 
     if (!userEmail || !title || !artist) {
       return Response.json({ error: 'Email, title, and artist are required' }, { status: 400 })
+    }
+
+    // Check if tables exist first
+    try {
+      await prisma.$queryRaw`SELECT 1 FROM "Song" LIMIT 1`
+      await prisma.$queryRaw`SELECT 1 FROM "UserSong" LIMIT 1`
+    } catch (tableError) {
+      return Response.json({ 
+        error: 'Song tables not initialized. Please contact support.' 
+      }, { status: 500 })
     }
 
     // Find user
@@ -57,54 +93,72 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Create or find song
-    let song = await prisma.song.findFirst({
-      where: {
-        AND: [
-          { title: { equals: title.trim(), mode: 'insensitive' } },
-          { artist: { equals: artist.trim(), mode: 'insensitive' } }
-        ]
-      }
-    })
+    // Create or find song using raw query
+    const existingSongs = await prisma.$queryRaw`
+      SELECT id FROM "Song" 
+      WHERE lower(title) = lower(${title.trim()}) 
+      AND lower(artist) = lower(${artist.trim()})
+      LIMIT 1
+    ` as any[]
 
-    if (!song) {
-      song = await prisma.song.create({
-        data: {
-          id: crypto.randomUUID(),
-          title: title.trim(),
-          artist: artist.trim(),
-          genre: genre || null,
-          key: key || null
-        }
-      })
+    let songId: string
+    
+    if (existingSongs.length > 0) {
+      songId = existingSongs[0].id
+    } else {
+      songId = crypto.randomUUID()
+      await prisma.$executeRaw`
+        INSERT INTO "Song" (id, title, artist, genre, key)
+        VALUES (${songId}, ${title.trim()}, ${artist.trim()}, ${genre || null}, ${key || null})
+      `
     }
 
     // Check if user already knows this song
-    const existingUserSong = await prisma.userSong.findFirst({
-      where: {
-        userId: user.id,
-        songId: song.id
-      }
-    })
+    const existingUserSongs = await prisma.$queryRaw`
+      SELECT id FROM "UserSong" 
+      WHERE "userId" = ${user.id} AND "songId" = ${songId}
+      LIMIT 1
+    ` as any[]
 
-    if (existingUserSong) {
+    if (existingUserSongs.length > 0) {
       return Response.json({ error: 'Song already in your library' }, { status: 400 })
     }
 
     // Add song to user's library
-    const userSong = await prisma.userSong.create({
-      data: {
-        id: crypto.randomUUID(),
-        userId: user.id,
-        songId: song.id,
-        proficiency: proficiency || 'comfortable'
-      },
-      include: {
-        song: true
-      }
-    })
+    const userSongId = crypto.randomUUID()
+    await prisma.$executeRaw`
+      INSERT INTO "UserSong" (id, "userId", "songId", proficiency)
+      VALUES (${userSongId}, ${user.id}, ${songId}, ${proficiency || 'comfortable'})
+    `
 
-    return Response.json(userSong, { status: 201 })
+    // Get the created record
+    const newUserSong = await prisma.$queryRaw`
+      SELECT 
+        us.id,
+        us.proficiency,
+        s.id as song_id,
+        s.title,
+        s.artist,
+        s.genre,
+        s.key
+      FROM "UserSong" us
+      JOIN "Song" s ON us."songId" = s.id
+      WHERE us.id = ${userSongId}
+    ` as any[]
+
+    const formattedSong = {
+      id: newUserSong[0].id,
+      proficiency: newUserSong[0].proficiency,
+      song: {
+        id: newUserSong[0].song_id,
+        title: newUserSong[0].title,
+        artist: newUserSong[0].artist,
+        genre: newUserSong[0].genre,
+        key: newUserSong[0].key
+      }
+    }
+
+    return Response.json(formattedSong, { status: 201 })
   } catch (error) {
     console.error('Add song error:', error)
     return Response.json({ error: 'Failed to add song' }, { status: 500 })

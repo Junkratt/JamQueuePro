@@ -23,8 +23,8 @@ const createTransporter = () => {
       }
     })
   } else {
-    // Development - log emails
-    return nodemailer.createTransporter({
+    // Development - use ethereal for testing
+    return nodemailer.createTransport({
       host: 'smtp.ethereal.email',
       port: 587,
       auth: {

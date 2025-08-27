@@ -6,22 +6,25 @@ import nodemailer from 'nodemailer'
 
 const prisma = new PrismaClient()
 
-// Create email transporter (you'll need to configure this with your email service)
+// Create email transporter with Mailgun
 const createTransporter = () => {
   if (process.env.NODE_ENV === 'production') {
-    // Production email configuration
+    // Production Mailgun SMTP configuration
     return nodemailer.createTransport({
-      host: process.env.EMAIL_HOST,
+      host: process.env.EMAIL_HOST || 'smtp.mailgun.org',
       port: parseInt(process.env.EMAIL_PORT || '587'),
-      secure: process.env.EMAIL_SECURE === 'true',
+      secure: process.env.EMAIL_SECURE === 'true', // false for port 587
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
+        user: process.env.EMAIL_USER, // postmaster@your-domain.mailgun.org
+        pass: process.env.EMAIL_PASS  // your mailgun password
+      },
+      tls: {
+        rejectUnauthorized: false
       }
     })
   } else {
-    // Development - use ethereal for testing
-    return nodemailer.createTransport({
+    // Development - log emails
+    return nodemailer.createTransporter({
       host: 'smtp.ethereal.email',
       port: 587,
       auth: {
@@ -80,7 +83,8 @@ async function sendVerificationEmail(email: string, token: string) {
 
   try {
     const transporter = createTransporter()
-    await transporter.sendMail(mailOptions)
+    const info = await transporter.sendMail(mailOptions)
+    console.log('Email sent successfully:', info.messageId)
     return true
   } catch (error) {
     console.error('Failed to send verification email:', error)

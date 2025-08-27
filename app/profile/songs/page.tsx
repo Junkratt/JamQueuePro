@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navigation from '../../components/Navigation'
+import SongAutocomplete from '../../components/SongAutocomplete'
 
 interface UserSong {
   id: string
@@ -25,6 +26,7 @@ export default function SongLibrary() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [showManualInput, setShowManualInput] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -45,6 +47,17 @@ export default function SongLibrary() {
     } catch (error) {
       console.error('Failed to fetch songs:', error)
     }
+  }
+
+  const handleSongSelect = (selectedSong: { title: string; artist: string; genre?: string }) => {
+    setNewSong({
+      title: selectedSong.title,
+      artist: selectedSong.artist,
+      genre: selectedSong.genre || '',
+      key: '',
+      proficiency: 'comfortable'
+    })
+    setMessage(`Selected: ${selectedSong.title} by ${selectedSong.artist}`)
   }
 
   const addSong = async () => {
@@ -72,6 +85,7 @@ export default function SongLibrary() {
         setSongs([...songs, data])
         setNewSong({ title: '', artist: '', genre: '', key: '', proficiency: 'comfortable' })
         setMessage('Song added successfully!')
+        setTimeout(() => setMessage(''), 3000)
       } else {
         setMessage(data.error || 'Failed to add song')
       }
@@ -91,6 +105,7 @@ export default function SongLibrary() {
       if (response.ok) {
         setSongs(songs.filter(s => s.id !== userSongId))
         setMessage('Song removed successfully!')
+        setTimeout(() => setMessage(''), 3000)
       }
     } catch (error) {
       setMessage('Failed to remove song')
@@ -144,6 +159,58 @@ export default function SongLibrary() {
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '0.5rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Add New Song</h2>
           
+          {!showManualInput ? (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                🎵 Search for a song (recommended)
+              </label>
+              <div style={{ marginBottom: '1rem' }}>
+                <SongAutocomplete onSongSelect={handleSongSelect} placeholder="Start typing a song name or artist..." />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                  🎯 Search millions of songs from iTunes • Get accurate info automatically
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowManualInput(true)}
+                  style={{ 
+                    fontSize: '0.875rem', 
+                    color: '#2563eb', 
+                    background: 'none', 
+                    border: '1px solid #2563eb',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  📝 Enter manually instead
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <label style={{ fontWeight: '500' }}>📝 Manual Entry</label>
+                <button
+                  type="button"
+                  onClick={() => setShowManualInput(false)}
+                  style={{ 
+                    fontSize: '0.875rem', 
+                    color: '#2563eb', 
+                    background: 'none', 
+                    border: '1px solid #2563eb',
+                    padding: '0.5rem 1rem',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🎵 ← Back to search
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             <input
               type="text"
@@ -188,25 +255,26 @@ export default function SongLibrary() {
               onChange={(e) => setNewSong({ ...newSong, proficiency: e.target.value })}
               style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem' }}
             >
-              <option value="learning">Learning</option>
-              <option value="comfortable">Comfortable</option>
-              <option value="expert">Expert</option>
+              <option value="learning">📚 Learning</option>
+              <option value="comfortable">✅ Comfortable</option>
+              <option value="expert">🎯 Expert</option>
             </select>
           </div>
           
           <button
             onClick={addSong}
-            disabled={isLoading}
+            disabled={isLoading || !newSong.title.trim() || !newSong.artist.trim()}
             style={{
-              backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
+              backgroundColor: (isLoading || !newSong.title.trim() || !newSong.artist.trim()) ? '#9ca3af' : '#2563eb',
               color: 'white',
               padding: '0.75rem 1.5rem',
               borderRadius: '0.375rem',
               border: 'none',
-              cursor: isLoading ? 'not-allowed' : 'pointer'
+              cursor: (isLoading || !newSong.title.trim() || !newSong.artist.trim()) ? 'not-allowed' : 'pointer',
+              fontWeight: '500'
             }}
           >
-            {isLoading ? 'Adding...' : 'Add Song'}
+            {isLoading ? '⏳ Adding...' : '➕ Add Song'}
           </button>
         </div>
 
@@ -215,8 +283,9 @@ export default function SongLibrary() {
             padding: '1rem',
             borderRadius: '0.375rem',
             marginBottom: '1rem',
-            backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
-            color: message.includes('success') ? '#065f46' : '#991b1b'
+            backgroundColor: message.includes('success') || message.includes('Selected') ? '#d1fae5' : '#fee2e2',
+            color: message.includes('success') || message.includes('Selected') ? '#065f46' : '#991b1b',
+            fontWeight: '500'
           }}>
             {message}
           </div>
@@ -224,10 +293,10 @@ export default function SongLibrary() {
 
         <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>My Songs ({filteredSongs.length})</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>🎵 My Songs ({filteredSongs.length})</h2>
             <input
               type="text"
-              placeholder="Search songs..."
+              placeholder="🔍 Search songs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ padding: '0.75rem', border: '1px solid #d1d5db', borderRadius: '0.375rem', width: '300px' }}
@@ -236,9 +305,15 @@ export default function SongLibrary() {
 
           <div style={{ display: 'grid', gap: '1rem' }}>
             {filteredSongs.length === 0 ? (
-              <p style={{ textAlign: 'center', color: '#6b7280', padding: '2rem' }}>
-                {searchTerm ? 'No songs match your search.' : 'No songs in your library yet. Add some songs to help match with other musicians!'}
-              </p>
+              <div style={{ textAlign: 'center', color: '#6b7280', padding: '3rem' }}>
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🎵</div>
+                <p style={{ fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                  {searchTerm ? 'No songs match your search.' : 'No songs in your library yet.'}
+                </p>
+                <p style={{ fontSize: '0.9rem' }}>
+                  {!searchTerm && 'Add some songs using the search above to help match with other musicians!'}
+                </p>
+              </div>
             ) : (
               filteredSongs.map((userSong) => (
                 <div key={userSong.id} style={{
@@ -251,11 +326,13 @@ export default function SongLibrary() {
                   alignItems: 'center'
                 }}>
                   <div>
-                    <h3 style={{ fontWeight: '600', marginBottom: '0.25rem' }}>{userSong.song.title}</h3>
+                    <h3 style={{ fontWeight: '600', marginBottom: '0.25rem', fontSize: '1.1rem' }}>
+                      🎵 {userSong.song.title}
+                    </h3>
                     <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
-                      {userSong.song.artist}
-                      {userSong.song.genre && ` • ${userSong.song.genre}`}
-                      {userSong.song.key && ` • Key: ${userSong.song.key}`}
+                      👤 {userSong.song.artist}
+                      {userSong.song.genre && ` • 🎪 ${userSong.song.genre}`}
+                      {userSong.song.key && ` • 🎹 Key: ${userSong.song.key}`}
                     </p>
                   </div>
                   
@@ -269,13 +346,20 @@ export default function SongLibrary() {
                       fontSize: '0.875rem'
                     }}
                   >
-                    <option value="learning">Learning</option>
-                    <option value="comfortable">Comfortable</option>
-                    <option value="expert">Expert</option>
+                    <option value="learning">📚 Learning</option>
+                    <option value="comfortable">✅ Comfortable</option>
+                    <option value="expert">🎯 Expert</option>
                   </select>
                   
                   <button 
-                    style={{ color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: '0.5rem' }}
+                    style={{ 
+                      color: '#dc2626', 
+                      background: 'none', 
+                      border: '1px solid #dc2626',
+                      borderRadius: '0.375rem',
+                      cursor: 'pointer', 
+                      padding: '0.5rem'
+                    }}
                     onClick={() => removeSong(userSong.id)}
                   >
                     🗑️ Remove

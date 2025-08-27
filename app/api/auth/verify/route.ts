@@ -93,69 +93,61 @@ export async function POST(request: NextRequest) {
       data: { emailVerificationToken: verificationToken }
     })
 
-    // Send verification email (reuse the function from register route)
-    const nodemailer = require('nodemailer')
-    
-    const createTransporter = () => {
-      if (process.env.NODE_ENV === 'production') {
-        return nodemailer.createTransport({
-          host: process.env.EMAIL_HOST,
-          port: parseInt(process.env.EMAIL_PORT || '587'),
-          secure: process.env.EMAIL_SECURE === 'true',
-          auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-          }
-        })
-      } else {
-        return nodemailer.createTransport({
-          jsonTransport: true
-        })
-      }
-    }
-
-    const transporter = createTransporter()
+    // In development, just log the verification details
     const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify?token=${verificationToken}`
     
-    const mailOptions = {
-      from: process.env.EMAIL_FROM || 'noreply@jamqueuepro.com',
-      to: email,
-      subject: 'Verify Your Email - Jam Queue Pro',
-      html: `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #2563eb;">Jam Queue Pro</h1>
-          </div>
-          
-          <h2>Email Verification</h2>
-          <p>Please verify your email address by clicking the button below:</p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${verificationUrl}" 
-               style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
-              Verify Email Address
-            </a>
-          </div>
-          
-          <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
-          <p style="word-break: break-all; color: #6b7280;">${verificationUrl}</p>
-          
-          <p>This verification link will expire in 24 hours.</p>
-        </div>
-      `
-    }
-
-    try {
-      const info = await transporter.sendMail(mailOptions)
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Verification email resent to:', email)
-        console.log('Verification URL:', verificationUrl)
-        if (info.message) {
-          console.log('Email content (JSON):', JSON.parse(info.message.toString()))
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('=== DEVELOPMENT EMAIL RESEND ===')
+      console.log('To:', email)
+      console.log('Verification URL:', verificationUrl)
+      console.log('==============================')
+    } else {
+      // In production, you would send the actual email here
+      const nodemailer = require('nodemailer')
+      
+      const transporter = nodemailer.createTransport({
+        host: process.env.EMAIL_HOST,
+        port: parseInt(process.env.EMAIL_PORT || '587'),
+        secure: process.env.EMAIL_SECURE === 'true',
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS
         }
+      })
+      
+      const mailOptions = {
+        from: process.env.EMAIL_FROM || 'noreply@jamqueuepro.com',
+        to: email,
+        subject: 'Verify Your Email - Jam Queue Pro',
+        html: `
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif;">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #2563eb;">Jam Queue Pro</h1>
+            </div>
+            
+            <h2>Email Verification</h2>
+            <p>Please verify your email address by clicking the button below:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${verificationUrl}" 
+                 style="background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                Verify Email Address
+              </a>
+            </div>
+            
+            <p>If the button doesn't work, you can also copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #6b7280;">${verificationUrl}</p>
+            
+            <p>This verification link will expire in 24 hours.</p>
+          </div>
+        `
       }
-    } catch (error) {
-      console.error('Failed to send verification email:', error)
+
+      try {
+        await transporter.sendMail(mailOptions)
+      } catch (error) {
+        console.error('Failed to send verification email:', error)
+      }
     }
 
     return NextResponse.json({

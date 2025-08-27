@@ -20,15 +20,19 @@ const createTransporter = () => {
       }
     })
   } else {
-    // Development - use jsonTransport instead of streamTransport
+    // Development - use ethereal for testing
     return nodemailer.createTransport({
-      jsonTransport: true
+      host: 'smtp.ethereal.email',
+      port: 587,
+      auth: {
+        user: 'ethereal.user@ethereal.email',
+        pass: 'ethereal.pass'
+      }
     })
   }
 }
 
 async function sendVerificationEmail(email: string, token: string) {
-  const transporter = createTransporter()
   const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify?token=${token}`
   
   const mailOptions = {
@@ -64,15 +68,19 @@ async function sendVerificationEmail(email: string, token: string) {
     `
   }
 
+  if (process.env.NODE_ENV !== 'production') {
+    // In development, just log the email details
+    console.log('=== DEVELOPMENT EMAIL ===')
+    console.log('To:', email)
+    console.log('Verification URL:', verificationUrl)
+    console.log('Subject:', mailOptions.subject)
+    console.log('========================')
+    return true
+  }
+
   try {
-    const info = await transporter.sendMail(mailOptions)
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('Verification email would be sent to:', email)
-      console.log('Verification URL:', verificationUrl)
-      if (info.message) {
-        console.log('Email content (JSON):', JSON.parse(info.message.toString()))
-      }
-    }
+    const transporter = createTransporter()
+    await transporter.sendMail(mailOptions)
     return true
   } catch (error) {
     console.error('Failed to send verification email:', error)

@@ -40,7 +40,7 @@ export async function POST() {
         ADD CONSTRAINT "UserSong_userId_fkey" 
         FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE`
     } catch (e) {
-      console.log('UserSong userId constraint already exists or failed:', e)
+      console.log('UserSong userId constraint already exists or failed')
     }
 
     try {
@@ -49,7 +49,7 @@ export async function POST() {
         ADD CONSTRAINT "UserSong_songId_fkey" 
         FOREIGN KEY ("songId") REFERENCES "Song"("id") ON DELETE CASCADE`
     } catch (e) {
-      console.log('UserSong songId constraint already exists or failed:', e)
+      console.log('UserSong songId constraint already exists or failed')
     }
 
     // Add indexes
@@ -58,7 +58,7 @@ export async function POST() {
         CREATE UNIQUE INDEX IF NOT EXISTS "Song_title_artist_idx" 
         ON "Song"(lower(title), lower(artist))`
     } catch (e) {
-      console.log('Song index already exists or failed:', e)
+      console.log('Song index already exists or failed')
     }
 
     try {
@@ -66,12 +66,15 @@ export async function POST() {
         CREATE UNIQUE INDEX IF NOT EXISTS "UserSong_userId_songId_idx" 
         ON "UserSong"("userId", "songId")`
     } catch (e) {
-      console.log('UserSong index already exists or failed:', e)
+      console.log('UserSong index already exists or failed')
     }
 
-    // Test the tables
-    const songCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Song"`
-    const userSongCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "UserSong"`
+    // Test the tables with CAST to avoid BigInt issues
+    const songCountResult = await prisma.$queryRaw`SELECT CAST(COUNT(*) AS INTEGER) as count FROM "Song"`
+    const userSongCountResult = await prisma.$queryRaw`SELECT CAST(COUNT(*) AS INTEGER) as count FROM "UserSong"`
+
+    const songCount = (songCountResult as any[])[0]?.count || 0
+    const userSongCount = (userSongCountResult as any[])[0]?.count || 0
 
     console.log('Migration completed successfully')
 

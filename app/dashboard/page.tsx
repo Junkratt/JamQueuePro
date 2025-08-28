@@ -12,9 +12,11 @@ export default function Dashboard() {
   const router = useRouter()
   const [stats, setStats] = useState({
     upcomingEvents: 0,
-    userEvents: 0,
-    venues: 0
+    userSignups: 0,
+    totalVenues: 0,
+    userSongs: 0
   })
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     setMounted(true)
@@ -24,9 +26,68 @@ export default function Dashboard() {
     if (mounted && status !== 'loading' && !session) {
       router.push('/auth/signin')
     }
+    if (mounted && session) {
+      fetchDashboardStats()
+    }
   }, [session, status, router, mounted])
 
-  if (!mounted || status === 'loading') {
+  const fetchDashboardStats = async () => {
+    try {
+      // Fetch events count
+      const eventsResponse = await fetch('/api/events')
+      const eventsData = eventsResponse.ok ? await eventsResponse.json() : []
+      
+      // Fetch venues count
+      const venuesResponse = await fetch('/api/venues')
+      const venuesData = venuesResponse.ok ? await venuesResponse.json() : []
+      
+      // Fetch user's songs count
+      let userSongsCount = 0
+      if (session?.user?.email) {
+        const songsResponse = await fetch(`/api/user/songs?email=${session.user.email}`)
+        const songsData = songsResponse.ok ? await songsResponse.json() : []
+        userSongsCount = songsData.length
+      }
+
+      // Count user's signups across all events
+      let userSignupsCount = 0
+      if (eventsData.length > 0 && session?.user?.email) {
+        for (const event of eventsData) {
+          try {
+            const signupsResponse = await fetch(`/api/events/${event.id}/signups`)
+            if (signupsResponse.ok) {
+              const signupsData = await signupsResponse.json()
+              const userSignup = signupsData.find((signup: any) => 
+                signup.user?.email === session.user.email
+              )
+              if (userSignup) userSignupsCount++
+            }
+          } catch (error) {
+            console.error('Error fetching signups for event:', event.id)
+          }
+        }
+      }
+
+      setStats({
+        upcomingEvents: eventsData.length || 0,
+        userSignups: userSignupsCount,
+        totalVenues: venuesData.length || 0,
+        userSongs: userSongsCount
+      })
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error)
+      setStats({
+        upcomingEvents: 0,
+        userSignups: 0,
+        totalVenues: 0,
+        userSongs: 0
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!mounted || status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="flex items-center space-x-2">
@@ -55,7 +116,7 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
             <div className="p-6">
               <div className="flex items-center">
@@ -82,7 +143,7 @@ export default function Dashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">My Signups</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.userEvents}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.userSignups}</p>
                 </div>
               </div>
             </div>
@@ -98,7 +159,23 @@ export default function Dashboard() {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Local Venues</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.venues}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.totalVenues}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                    <span className="text-orange-600 text-lg">🎶</span>
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">My Songs</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.userSongs}</p>
                 </div>
               </div>
             </div>

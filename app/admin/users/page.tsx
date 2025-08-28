@@ -37,6 +37,8 @@ export default function AdminUsers() {
     total: 0,
     pages: 0
   })
+  const [showPasswordReset, setShowPasswordReset] = useState<string | null>(null)
+  const [showRoleChange, setShowRoleChange] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -75,6 +77,52 @@ export default function AdminUsers() {
     }
   }
 
+  const handlePasswordReset = async (userId: string, customPassword?: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/reset-password?adminEmail=${session?.user?.email}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          temporaryPassword: customPassword || null,
+          forceChange: true 
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        alert(`Password reset successfully!\n\nUser: ${data.userEmail}\nTemporary Password: ${data.temporaryPassword}\n\nPlease share this password securely with the user.`)
+        setShowPasswordReset(null)
+      } else {
+        alert(`Failed to reset password: ${data.error}`)
+      }
+    } catch (error) {
+      alert('Network error')
+    }
+  }
+
+  const handleRoleChange = async (userId: string, newRole: string, reason?: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/role?adminEmail=${session?.user?.email}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole, reason })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        alert(`Role updated successfully!\n\nUser: ${data.userEmail}\nOld Role: ${data.oldRole}\nNew Role: ${data.newRole}`)
+        setShowRoleChange(null)
+        fetchUsers()
+      } else {
+        alert(`Failed to update role: ${data.error}`)
+      }
+    } catch (error) {
+      alert('Network error')
+    }
+  }
+
   const handleSuspendUser = async (userId: string, action: 'suspend' | 'unsuspend', reason?: string) => {
     try {
       const response = await fetch(`/api/admin/users/${userId}/suspend?adminEmail=${session?.user?.email}`, {
@@ -84,7 +132,7 @@ export default function AdminUsers() {
       })
 
       if (response.ok) {
-        fetchUsers() // Refresh the list
+        fetchUsers()
       } else {
         alert('Failed to update user status')
       }
@@ -104,7 +152,7 @@ export default function AdminUsers() {
       })
 
       if (response.ok) {
-        fetchUsers() // Refresh the list
+        fetchUsers()
       } else {
         alert('Failed to delete user')
       }
@@ -149,7 +197,7 @@ export default function AdminUsers() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <Link href="/admin" style={{ color: '#93c5fd', textDecoration: 'none' }}>← Admin Dashboard</Link>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>👥 User Management</h1>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>User Management</h1>
           </div>
           <Link 
             href="/admin/users/create"
@@ -161,12 +209,12 @@ export default function AdminUsers() {
               textDecoration: 'none' 
             }}
           >
-            ➕ Create User
+            Create User
           </Link>
         </div>
       </div>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 1rem' }}>
         {/* Filters */}
         <div style={{ 
           backgroundColor: 'white', 
@@ -279,16 +327,31 @@ export default function AdminUsers() {
                           </div>
                         </td>
                         <td style={{ padding: '0.75rem' }}>
-                          <span style={{
-                            backgroundColor: roleColor.bg,
-                            color: roleColor.color,
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500'
-                          }}>
-                            {user.role}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{
+                              backgroundColor: roleColor.bg,
+                              color: roleColor.color,
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: '9999px',
+                              fontSize: '0.75rem',
+                              fontWeight: '500'
+                            }}>
+                              {user.role}
+                            </span>
+                            <button
+                              onClick={() => setShowRoleChange(user.id)}
+                              style={{
+                                backgroundColor: '#f3f4f6',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '0.25rem',
+                                padding: '0.25rem',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem'
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
                         </td>
                         <td style={{ padding: '0.75rem' }}>
                           <span style={{
@@ -312,7 +375,7 @@ export default function AdminUsers() {
                             <div>
                               <div>{user.phone}</div>
                               <div style={{ color: user.phoneVerified ? '#10b981' : '#f59e0b', fontSize: '0.75rem' }}>
-                                {user.phoneVerified ? '✓ Verified' : '⚠ Unverified'}
+                                {user.phoneVerified ? 'Verified' : 'Unverified'}
                               </div>
                             </div>
                           ) : (
@@ -323,7 +386,22 @@ export default function AdminUsers() {
                           {new Date(user.createdAt).toLocaleDateString()}
                         </td>
                         <td style={{ padding: '0.75rem' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                            <button
+                              onClick={() => setShowPasswordReset(user.id)}
+                              style={{
+                                backgroundColor: '#dbeafe',
+                                color: '#1e40af',
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '0.375rem',
+                                border: 'none',
+                                fontSize: '0.75rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Reset Password
+                            </button>
+                            
                             {user.status === 'active' ? (
                               <button
                                 onClick={() => {
@@ -419,6 +497,156 @@ export default function AdminUsers() {
           )}
         </div>
       </main>
+
+      {/* Password Reset Modal */}
+      {showPasswordReset && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            minWidth: '400px',
+            maxWidth: '500px'
+          }}>
+            <h3 style={{ marginBottom: '1rem', fontWeight: '600' }}>Reset Password</h3>
+            <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
+              Choose to generate a random password or set a custom one:
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
+              <button
+                onClick={() => handlePasswordReset(showPasswordReset)}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.375rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Generate Random Password
+              </button>
+              <button
+                onClick={() => {
+                  const customPassword = prompt('Enter custom password (min 8 characters):')
+                  if (customPassword && customPassword.length >= 8) {
+                    handlePasswordReset(showPasswordReset, customPassword)
+                  } else if (customPassword) {
+                    alert('Password must be at least 8 characters long')
+                  }
+                }}
+                style={{
+                  backgroundColor: '#10b981',
+                  color: 'white',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.375rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Set Custom Password
+              </button>
+            </div>
+            <button
+              onClick={() => setShowPasswordReset(null)}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.375rem',
+                border: 'none',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Role Change Modal */}
+      {showRoleChange && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          backgroundColor: 'rgba(0,0,0,0.5)', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{ 
+            backgroundColor: 'white', 
+            padding: '2rem', 
+            borderRadius: '0.5rem', 
+            minWidth: '400px'
+          }}>
+            <h3 style={{ marginBottom: '1rem', fontWeight: '600' }}>Change User Role</h3>
+            <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
+              Select the new role for this user:
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
+              {['performer', 'organizer', 'admin'].map(role => (
+                <button
+                  key={role}
+                  onClick={() => {
+                    const reason = prompt(`Reason for changing role to ${role}:`)
+                    if (reason !== null) {
+                      handleRoleChange(showRoleChange!, role, reason)
+                    }
+                  }}
+                  style={{
+                    backgroundColor: '#f3f4f6',
+                    border: '1px solid #d1d5db',
+                    padding: '0.75rem',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    textAlign: 'left'
+                  }}
+                >
+                  <strong>{role.charAt(0).toUpperCase() + role.slice(1)}</strong>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    {role === 'performer' && 'Can sign up for events and manage personal profile'}
+                    {role === 'organizer' && 'Can create and manage events at venues (requires phone verification)'}
+                    {role === 'admin' && 'Full system access including user and venue management'}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowRoleChange(null)}
+              style={{
+                backgroundColor: '#6b7280',
+                color: 'white',
+                padding: '0.5rem 1rem',
+                borderRadius: '0.375rem',
+                border: 'none',
+                cursor: 'pointer',
+                width: '100%'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

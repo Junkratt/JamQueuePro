@@ -9,8 +9,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   const authResult = await requireAdmin(request)
-  if (authResult.error) {
-    return Response.json({ error: authResult.error }, { status: authResult.status })
+  if (authResult.error || !authResult.admin) {
+    return Response.json({ error: authResult.error || 'Admin required' }, { status: authResult.status || 401 })
   }
 
   try {

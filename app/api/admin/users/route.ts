@@ -7,8 +7,8 @@ const prisma = new PrismaClient()
 // GET /api/admin/users - List all users with filtering
 export async function GET(request: NextRequest) {
   const authResult = await requireAdmin(request)
-  if (authResult.error) {
-    return Response.json({ error: authResult.error }, { status: authResult.status })
+  if (authResult.error || !authResult.admin) {
+    return Response.json({ error: authResult.error || 'Admin required' }, { status: authResult.status || 401 })
   }
 
   try {
@@ -71,8 +71,8 @@ export async function GET(request: NextRequest) {
 // POST /api/admin/users - Create new user
 export async function POST(request: NextRequest) {
   const authResult = await requireAdmin(request)
-  if (authResult.error) {
-    return Response.json({ error: authResult.error }, { status: authResult.status })
+  if (authResult.error || !authResult.admin) {
+    return Response.json({ error: authResult.error || 'Admin required' }, { status: authResult.status || 401 })
   }
 
   try {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
       tempPassword,
       note: 'Please share the temporary password securely with the user'
     }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Admin create user error:', error)
     if (error.code === '23505') { // Unique constraint violation
       return Response.json({ error: 'Email already exists' }, { status: 400 })

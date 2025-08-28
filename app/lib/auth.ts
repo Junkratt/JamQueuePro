@@ -1,10 +1,24 @@
 import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export async function requireAdmin(request: NextRequest) {
+interface User {
+  id: string
+  email: string
+  name: string | null
+  role: string
+  status: string
+}
+
+interface AuthResult {
+  admin?: User
+  user?: User
+  error: string | null
+  status?: number
+}
+
+export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
   try {
     // In a real app, you'd get the session from NextAuth
     // For now, we'll check via email parameter or header
@@ -16,7 +30,14 @@ export async function requireAdmin(request: NextRequest) {
     }
 
     const admin = await prisma.user.findUnique({
-      where: { email: adminEmail }
+      where: { email: adminEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true
+      }
     })
 
     if (!admin || admin.role !== 'admin' || admin.status !== 'active') {
@@ -29,7 +50,7 @@ export async function requireAdmin(request: NextRequest) {
   }
 }
 
-export async function requireRole(request: NextRequest, allowedRoles: string[]) {
+export async function requireRole(request: NextRequest, allowedRoles: string[]): Promise<AuthResult> {
   try {
     const userEmail = request.headers.get('user-email') || 
                      request.nextUrl.searchParams.get('userEmail')
@@ -39,7 +60,14 @@ export async function requireRole(request: NextRequest, allowedRoles: string[]) 
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: userEmail }
+      where: { email: userEmail },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        status: true
+      }
     })
 
     if (!user || user.status !== 'active') {

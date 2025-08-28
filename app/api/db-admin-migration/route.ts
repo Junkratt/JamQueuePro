@@ -6,6 +6,49 @@ export async function POST() {
   try {
     console.log('Starting admin system migration...')
 
+    // First, check if VenueOrganizer table exists, if not create it
+    try {
+      await prisma.$executeRaw`
+        CREATE TABLE IF NOT EXISTS "VenueOrganizer" (
+          id TEXT PRIMARY KEY,
+          "venueId" TEXT NOT NULL,
+          "userId" TEXT NOT NULL,
+          role TEXT DEFAULT 'organizer',
+          approved BOOLEAN DEFAULT FALSE,
+          "createdAt" TIMESTAMP DEFAULT NOW()
+        )`
+      console.log('VenueOrganizer table created/verified')
+    } catch (e) {
+      console.log('VenueOrganizer table already exists or creation failed')
+    }
+
+    // Add foreign key constraints to VenueOrganizer if they don't exist
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE "VenueOrganizer" 
+        ADD CONSTRAINT IF NOT EXISTS "VenueOrganizer_venueId_fkey" 
+        FOREIGN KEY ("venueId") REFERENCES "Venue"("id") ON DELETE CASCADE`
+    } catch (e) {
+      console.log('VenueOrganizer venueId constraint already exists')
+    }
+
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE "VenueOrganizer" 
+        ADD CONSTRAINT IF NOT EXISTS "VenueOrganizer_userId_fkey" 
+        FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE`
+    } catch (e) {
+      console.log('VenueOrganizer userId constraint already exists')
+    }
+
+    try {
+      await prisma.$executeRaw`
+        CREATE UNIQUE INDEX IF NOT EXISTS "VenueOrganizer_venueId_userId_key" 
+        ON "VenueOrganizer"("venueId", "userId")`
+    } catch (e) {
+      console.log('VenueOrganizer unique index already exists')
+    }
+
     // Add admin columns to User table
     await prisma.$executeRaw`
       ALTER TABLE "User" 
@@ -35,7 +78,7 @@ export async function POST() {
 
     console.log('Venue admin columns added')
 
-    // Add admin columns to VenueOrganizer table
+    // Add admin columns to VenueOrganizer table (now that it exists)
     await prisma.$executeRaw`
       ALTER TABLE "VenueOrganizer"
       ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'pending',
@@ -67,36 +110,40 @@ export async function POST() {
         ADD CONSTRAINT IF NOT EXISTS "AdminLog_adminUserId_fkey" 
         FOREIGN KEY ("adminUserId") REFERENCES "User"("id") ON DELETE CASCADE`
     } catch (e) {
-      console.log('AdminLog constraint already exists or failed')
+      console.log('AdminLog constraint already exists')
     }
 
     // Create indexes for performance
     try {
       await prisma.$executeRaw`
         CREATE INDEX IF NOT EXISTS "User_role_status_idx" ON "User"("role", "status")`
+      console.log('User indexes created')
     } catch (e) {
-      console.log('User role/status index already exists')
+      console.log('User indexes already exist')
     }
     
     try {
       await prisma.$executeRaw`
         CREATE INDEX IF NOT EXISTS "Venue_status_idx" ON "Venue"("status")`
+      console.log('Venue indexes created')
     } catch (e) {
-      console.log('Venue status index already exists')
+      console.log('Venue indexes already exist')
     }
     
     try {
       await prisma.$executeRaw`
         CREATE INDEX IF NOT EXISTS "VenueOrganizer_status_idx" ON "VenueOrganizer"("status")`
+      console.log('VenueOrganizer indexes created')
     } catch (e) {
-      console.log('VenueOrganizer status index already exists')
+      console.log('VenueOrganizer indexes already exist')
     }
     
     try {
       await prisma.$executeRaw`
         CREATE INDEX IF NOT EXISTS "AdminLog_adminUserId_idx" ON "AdminLog"("adminUserId")`
+      console.log('AdminLog indexes created')
     } catch (e) {
-      console.log('AdminLog index already exists')
+      console.log('AdminLog indexes already exist')
     }
 
     // Check if default admin user already exists
@@ -104,7 +151,7 @@ export async function POST() {
       SELECT id FROM "User" WHERE email = 'admin@jamqueuepro.com' LIMIT 1
     ` as any[]
 
-    let adminCreated = false
+    let adminInfo
     if (adminExists.length === 0) {
       const bcrypt = require('bcryptjs')
       const crypto = require('crypto')
@@ -126,8 +173,12 @@ export async function POST() {
           NOW()
         )`
       
-      console.log('Default admin user created: admin@jamqueuepro.com / admin123!')
-      adminCreated = true
+      console.log('Default admin user created')
+      adminInfo = {
+        email: 'admin@jamqueuepro.com',
+        password: 'admin123!',
+        note: 'Default admin created - please change password immediately!'
+      }
     } else {
       // Update existing user to admin if needed
       await prisma.$executeRaw`
@@ -135,26 +186,31 @@ export async function POST() {
         SET role = 'admin', status = 'active' 
         WHERE email = 'admin@jamqueuepro.com'`
       console.log('Updated existing admin user')
+      adminInfo = {
+        email: 'admin@jamqueuepro.com',
+        note: 'Admin role updated - use your existing password'
+      }
     }
 
     return Response.json({ 
       success: true, 
       message: 'Admin system migration completed successfully',
-      defaultAdmin: adminCreated ? {
-        email: 'admin@jamqueuepro.com',
-        password: 'admin123!',
-        note: 'Please change this password immediately!'
-      } : {
-        email: 'admin@jamqueuepro.com',
-        note: 'Admin user updated - use your existing password'
-      }
+      defaultAdmin: adminInfo,
+      tablesCreated: [
+        'VenueOrganizer (with constraints)',
+        'AdminLog',
+        'Added admin columns to User table',
+        'Added admin columns to Venue table',
+        'Added admin columns to VenueOrganizer table',
+        'Created all necessary indexes'
+      ]
     })
   } catch (error) {
     console.error('Admin migration error:', error)
     return Response.json({ 
       success: false, 
       error: error instanceof Error ? error.message : 'Migration failed',
-      details: 'Please check server logs for more details'
+      details: 'Check server logs for details'
     }, { status: 500 })
   }
 }

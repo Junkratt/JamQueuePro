@@ -54,31 +54,57 @@ export async function POST() {
         action TEXT NOT NULL,
         "targetType" TEXT NOT NULL,
         "targetId" TEXT NOT NULL,
-        details JSONB,
-        "createdAt" TIMESTAMP DEFAULT NOW(),
-        FOREIGN KEY ("adminUserId") REFERENCES "User"("id") ON DELETE CASCADE
+        details TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
       )`
 
     console.log('AdminLog table created')
 
-    // Create indexes for performance
-    await prisma.$executeRaw`
-      CREATE INDEX IF NOT EXISTS "User_role_status_idx" ON "User"("role", "status")`
-    
-    await prisma.$executeRaw`
-      CREATE INDEX IF NOT EXISTS "Venue_status_idx" ON "Venue"("status")`
-    
-    await prisma.$executeRaw`
-      CREATE INDEX IF NOT EXISTS "VenueOrganizer_status_idx" ON "VenueOrganizer"("status")`
-    
-    await prisma.$executeRaw`
-      CREATE INDEX IF NOT EXISTS "AdminLog_adminUserId_idx" ON "AdminLog"("adminUserId")`
+    // Add foreign key constraint for AdminLog
+    try {
+      await prisma.$executeRaw`
+        ALTER TABLE "AdminLog" 
+        ADD CONSTRAINT IF NOT EXISTS "AdminLog_adminUserId_fkey" 
+        FOREIGN KEY ("adminUserId") REFERENCES "User"("id") ON DELETE CASCADE`
+    } catch (e) {
+      console.log('AdminLog constraint already exists or failed')
+    }
 
-    // Create a default admin user (you should change this!)
+    // Create indexes for performance
+    try {
+      await prisma.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "User_role_status_idx" ON "User"("role", "status")`
+    } catch (e) {
+      console.log('User role/status index already exists')
+    }
+    
+    try {
+      await prisma.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "Venue_status_idx" ON "Venue"("status")`
+    } catch (e) {
+      console.log('Venue status index already exists')
+    }
+    
+    try {
+      await prisma.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "VenueOrganizer_status_idx" ON "VenueOrganizer"("status")`
+    } catch (e) {
+      console.log('VenueOrganizer status index already exists')
+    }
+    
+    try {
+      await prisma.$executeRaw`
+        CREATE INDEX IF NOT EXISTS "AdminLog_adminUserId_idx" ON "AdminLog"("adminUserId")`
+    } catch (e) {
+      console.log('AdminLog index already exists')
+    }
+
+    // Check if default admin user already exists
     const adminExists = await prisma.$queryRaw`
-      SELECT id FROM "User" WHERE role = 'admin' LIMIT 1
+      SELECT id FROM "User" WHERE email = 'admin@jamqueuepro.com' LIMIT 1
     ` as any[]
 
+    let adminCreated = false
     if (adminExists.length === 0) {
       const bcrypt = require('bcryptjs')
       const crypto = require('crypto')
@@ -101,22 +127,34 @@ export async function POST() {
         )`
       
       console.log('Default admin user created: admin@jamqueuepro.com / admin123!')
+      adminCreated = true
+    } else {
+      // Update existing user to admin if needed
+      await prisma.$executeRaw`
+        UPDATE "User" 
+        SET role = 'admin', status = 'active' 
+        WHERE email = 'admin@jamqueuepro.com'`
+      console.log('Updated existing admin user')
     }
 
     return Response.json({ 
       success: true, 
       message: 'Admin system migration completed successfully',
-      defaultAdmin: adminExists.length === 0 ? {
+      defaultAdmin: adminCreated ? {
         email: 'admin@jamqueuepro.com',
         password: 'admin123!',
         note: 'Please change this password immediately!'
-      } : null
+      } : {
+        email: 'admin@jamqueuepro.com',
+        note: 'Admin user updated - use your existing password'
+      }
     })
   } catch (error) {
     console.error('Admin migration error:', error)
     return Response.json({ 
       success: false, 
-      error: error instanceof Error ? error.message : 'Migration failed'
+      error: error instanceof Error ? error.message : 'Migration failed',
+      details: 'Please check server logs for more details'
     }, { status: 500 })
   }
 }

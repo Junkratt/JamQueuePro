@@ -3,12 +3,55 @@
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function Navigation() {
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  // Check user role
+  useEffect(() => {
+    if (session?.user?.email) {
+      checkUserRole()
+    }
+  }, [session])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const checkUserRole = async () => {
+    try {
+      // Try to get user role from admin API (this will work if user has admin role)
+      const response = await fetch(`/api/admin/users?adminEmail=${session?.user?.email}&limit=1`)
+      if (response.ok) {
+        setUserRole('admin')
+      } else {
+        // If not admin, check if they're an organizer by checking their profile
+        const profileResponse = await fetch('/api/user/profile')
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json()
+          setUserRole(profileData.role || 'performer')
+        } else {
+          setUserRole('performer')
+        }
+      }
+    } catch (error) {
+      setUserRole('performer')
+    }
+  }
 
   const isActivePath = (path: string) => {
     if (path === '/dashboard' && pathname === '/dashboard') return true
@@ -179,36 +222,161 @@ export default function Navigation() {
           {/* User menu */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {session ? (
-              <>
-                <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                  Welcome, {session.user?.name?.split(' ')[0] || session.user?.email}
-                </span>
+              <div ref={userMenuRef} style={{ position: 'relative' }}>
                 <button
-                  onClick={() => signOut({ callbackUrl: '/' })}
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                   style={{
-                    backgroundColor: '#dc2626',
-                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
                     padding: '0.5rem 1rem',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #d1d5db',
                     borderRadius: '0.375rem',
-                    border: 'none',
+                    cursor: 'pointer',
                     fontSize: '0.875rem',
-                    fontWeight: '500',
-                    cursor: 'pointer'
+                    color: '#374151'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#b91c1c'
+                    e.currentTarget.style.backgroundColor = '#f9fafb'
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#dc2626'
+                    e.currentTarget.style.backgroundColor = 'transparent'
                   }}
                 >
-                  Sign Out
+                  <span>{session.user?.name?.split(' ')[0] || session.user?.email?.split('@')[0]}</span>
+                  {userRole && (
+                    <span style={{
+                      backgroundColor: userRole === 'admin' ? '#fef3c7' : userRole === 'organizer' ? '#dbeafe' : '#d1fae5',
+                      color: userRole === 'admin' ? '#92400e' : userRole === 'organizer' ? '#1e40af' : '#065f46',
+                      padding: '0.125rem 0.375rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: '500'
+                    }}>
+                      {userRole}
+                    </span>
+                  )}
+                  <span style={{ transform: isUserMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                 </button>
-              </>
+
+                {isUserMenuOpen && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: '0.25rem',
+                    width: '12rem',
+                    backgroundColor: 'white',
+                    borderRadius: '0.375rem',
+                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)',
+                    border: '1px solid #e5e7eb',
+                    zIndex: 20
+                  }}>
+                    <div style={{ padding: '0.5rem' }}>
+                      <Link
+                        href="/profile"
+                        style={{
+                          display: 'block',
+                          padding: '0.75rem',
+                          borderRadius: '0.25rem',
+                          textDecoration: 'none',
+                          color: '#374151',
+                          fontSize: '0.875rem',
+                          borderBottom: '1px solid #e5e7eb'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f3f4f6'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        My Profile
+                      </Link>
+
+                      <Link
+                        href="/dashboard"
+                        style={{
+                          display: 'block',
+                          padding: '0.75rem',
+                          borderRadius: '0.25rem',
+                          textDecoration: 'none',
+                          color: '#374151',
+                          fontSize: '0.875rem',
+                          borderBottom: userRole === 'admin' ? '1px solid #e5e7eb' : 'none'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#f3f4f6'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                        onClick={() => setIsUserMenuOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
+
+                      {userRole === 'admin' && (
+                        <Link
+                          href="/admin"
+                          style={{
+                            display: 'block',
+                            padding: '0.75rem',
+                            borderRadius: '0.25rem',
+                            textDecoration: 'none',
+                            color: '#92400e',
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            borderBottom: '1px solid #e5e7eb'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#fef3c7'
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = 'transparent'
+                          }}
+                          onClick={() => setIsUserMenuOpen(false)}
+                        >
+                          Admin Portal
+                        </Link>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setIsUserMenuOpen(false)
+                          signOut({ callbackUrl: '/' })
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '0.75rem',
+                          borderRadius: '0.25rem',
+                          backgroundColor: 'transparent',
+                          border: 'none',
+                          color: '#dc2626',
+                          fontSize: '0.875rem',
+                          cursor: 'pointer'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = '#fee2e2'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }}
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link
                 href="/auth/signin"
                 style={{
+                  display: 'inline-block',
                   backgroundColor: '#2563eb',
                   color: 'white',
                   padding: '0.5rem 1rem',

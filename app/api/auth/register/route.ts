@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { logActivity, extractRequestMetadata } from '../../../lib/activity'
 
 const prisma = new PrismaClient()
 
@@ -76,6 +77,14 @@ export async function POST(request: NextRequest) {
 
     // Validate input
     if (!email || !password || !name) {
+      await logActivity({
+        userEmail: email,
+        action: 'REGISTRATION_FAILED',
+        category: 'AUTH',
+        details: { reason: 'Missing required fields' },
+        metadata: extractRequestMetadata(request)
+      })
+      
       return NextResponse.json(
         { error: 'Email, password, and name are required' },
         { status: 400 }
@@ -85,6 +94,14 @@ export async function POST(request: NextRequest) {
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(email)) {
+      await logActivity({
+        userEmail: email,
+        action: 'REGISTRATION_FAILED',
+        category: 'AUTH',
+        details: { reason: 'Invalid email format' },
+        metadata: extractRequestMetadata(request)
+      })
+      
       return NextResponse.json(
         { error: 'Please enter a valid email address' },
         { status: 400 }
@@ -93,6 +110,14 @@ export async function POST(request: NextRequest) {
 
     // Validate password strength
     if (password.length < 8) {
+      await logActivity({
+        userEmail: email,
+        action: 'REGISTRATION_FAILED',
+        category: 'AUTH',
+        details: { reason: 'Password too short' },
+        metadata: extractRequestMetadata(request)
+      })
+      
       return NextResponse.json(
         { error: 'Password must be at least 8 characters long' },
         { status: 400 }
@@ -106,6 +131,14 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       if (existingUser.emailVerified) {
+        await logActivity({
+          userEmail: email,
+          action: 'REGISTRATION_FAILED',
+          category: 'AUTH',
+          details: { reason: 'Email already exists and verified' },
+          metadata: extractRequestMetadata(request)
+        })
+        
         return NextResponse.json(
           { error: 'An account with this email already exists' },
           { status: 400 }
@@ -124,6 +157,15 @@ export async function POST(request: NextRequest) {
         })
 
         const emailSent = await sendVerificationEmail(email, verificationToken)
+        
+        await logActivity({
+          userId: existingUser.id,
+          userEmail: email,
+          action: 'VERIFICATION_EMAIL_RESENT',
+          category: 'AUTH',
+          details: { emailSent },
+          metadata: extractRequestMetadata(request)
+        })
         
         return NextResponse.json({
           message: 'Verification email sent. Please check your email to complete registration.',
@@ -151,6 +193,16 @@ export async function POST(request: NextRequest) {
     // Send verification email
     const emailSent = await sendVerificationEmail(email, verificationToken)
 
+    // Log successful registration
+    await logActivity({
+      userId: user.id,
+      userEmail: email,
+      action: 'USER_REGISTERED',
+      category: 'AUTH',
+      details: { name, emailSent },
+      metadata: extractRequestMetadata(request)
+    })
+
     return NextResponse.json({
       message: 'Registration successful! Please check your email to verify your account.',
       userId: user.id,
@@ -159,6 +211,15 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Registration error:', error)
+    
+    await logActivity({
+      userEmail: request.url, // Fallback identifier
+      action: 'REGISTRATION_ERROR',
+      category: 'AUTH',
+      details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      metadata: extractRequestMetadata(request)
+    })
+    
     return NextResponse.json(
       { error: 'Registration failed. Please try again.' },
       { status: 500 }

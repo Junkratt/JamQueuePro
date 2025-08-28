@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
 
@@ -15,6 +16,15 @@ export async function GET(request: NextRequest) {
     if (users.length === 0) {
       return Response.json({ error: 'No users found' }, { status: 404 })
     }
+
+    // Log profile view
+    await logActivity({
+      userId: users[0].id,
+      userEmail: users[0].email,
+      action: 'PROFILE_VIEWED',
+      category: 'PROFILE',
+      metadata: extractRequestMetadata(request)
+    })
 
     return Response.json(users[0])
   } catch (error) {
@@ -72,6 +82,20 @@ export async function PUT(request: NextRequest) {
         experience: data.experience,
         bio: data.bio,
       }
+    })
+
+    // Log profile update
+    await logActivity({
+      userId: existingUser.id,
+      userEmail: data.email,
+      action: 'PROFILE_UPDATED',
+      category: 'PROFILE',
+      details: {
+        fieldsUpdated: Object.keys(data).filter(key => key !== 'email'),
+        instrumentCount: (data.instruments || []).length,
+        genreCount: (data.musicPrefs || []).length
+      },
+      metadata: extractRequestMetadata(request)
     })
 
     console.log('Profile updated successfully:', updatedUser)

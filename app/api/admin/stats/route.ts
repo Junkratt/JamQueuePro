@@ -77,20 +77,37 @@ export async function GET(request: NextRequest) {
       organizerStats = [{ pending_organizers: 0, approved_organizers: 0, rejected_organizers: 0 }]
     }
 
-    // Get recent admin actions - handle case where table doesn't exist
+    // Get recent admin actions with proper username display
     let recentActions
     try {
       recentActions = await prisma.$queryRaw`
         SELECT 
           al.action, al."targetType", al."targetId", al."createdAt",
-          u.name as admin_name
+          u.name as admin_name, u.email as admin_email
         FROM "AdminLog" al
-        JOIN "User" u ON al."adminUserId" = u.id
+        LEFT JOIN "User" u ON al."adminUserId" = u.id
         ORDER BY al."createdAt" DESC
         LIMIT 10
       ` as any[]
     } catch (logError) {
       recentActions = []
+    }
+
+    // Get recent user activity stats
+    let activityStats
+    try {
+      activityStats = await prisma.$queryRaw`
+        SELECT 
+          category,
+          CAST(COUNT(*) AS INTEGER) as count,
+          CAST(COUNT(DISTINCT "userId") AS INTEGER) as unique_users
+        FROM "ActivityLog" 
+        WHERE "createdAt" >= NOW() - INTERVAL '7 days'
+        GROUP BY category
+        ORDER BY count DESC
+      ` as any[]
+    } catch (activityError) {
+      activityStats = []
     }
 
     return Response.json({
@@ -106,7 +123,11 @@ export async function GET(request: NextRequest) {
       pendingOrganizers: organizerStats[0]?.pending_organizers || 0,
       approvedOrganizers: organizerStats[0]?.approved_organizers || 0,
       rejectedOrganizers: organizerStats[0]?.rejected_organizers || 0,
-      recentActions
+      recentActions: recentActions.map((action: any) => ({
+        ...action,
+        admin_name: action.admin_name || action.admin_email || 'Unknown Admin'
+      })),
+      activityStats: activityStats || []
     })
   } catch (error) {
     console.error('Admin stats error:', error)

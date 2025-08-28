@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
 
@@ -37,6 +38,25 @@ export async function POST(request: NextRequest) {
       }
     })
 
+    // Log event creation
+    await logActivity({
+      userId: organizer.id,
+      userEmail: data.organizerEmail,
+      action: 'EVENT_CREATED',
+      category: 'EVENTS',
+      details: {
+        eventId: event.id,
+        title: data.title,
+        type: data.type,
+        venueId: data.venueId,
+        duration: data.duration || 240,
+        houseband: data.houseband || false,
+        housebandSongCount: (data.housebandSongs || []).length,
+        maxCapacity: data.maxCapacity || null
+      },
+      metadata: extractRequestMetadata(request)
+    })
+
     return Response.json(event, { status: 201 })
   } catch (error) {
     console.error('Event creation error:', error)
@@ -47,7 +67,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const events = await prisma.event.findMany({
       include: {
@@ -73,6 +93,14 @@ export async function GET() {
       orderBy: {
         dateTime: 'asc'
       }
+    })
+
+    // Log events view (without specific user info since this might be public)
+    await logActivity({
+      action: 'EVENTS_LIST_VIEWED',
+      category: 'EVENTS',
+      details: { eventCount: events.length },
+      metadata: extractRequestMetadata(request)
     })
 
     return Response.json(events)

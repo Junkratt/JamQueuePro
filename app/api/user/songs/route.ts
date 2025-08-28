@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import crypto from 'crypto'
+import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
 
@@ -59,6 +60,16 @@ export async function GET(request: NextRequest) {
       }
     }))
 
+    // Log songs library view
+    await logActivity({
+      userId: user.id,
+      userEmail: userEmail,
+      action: 'SONGS_LIBRARY_VIEWED',
+      category: 'SONGS',
+      details: { songCount: formattedSongs.length },
+      metadata: extractRequestMetadata(request)
+    })
+
     return Response.json(formattedSongs)
   } catch (error) {
     console.error('Songs fetch error:', error)
@@ -102,11 +113,13 @@ export async function POST(request: NextRequest) {
     ` as any[]
 
     let songId: string
+    let isNewSong = false
     
     if (existingSongs.length > 0) {
       songId = existingSongs[0].id
     } else {
       songId = crypto.randomUUID()
+      isNewSong = true
       await prisma.$executeRaw`
         INSERT INTO "Song" (id, title, artist, genre, key)
         VALUES (${songId}, ${title.trim()}, ${artist.trim()}, ${genre || null}, ${key || null})
@@ -157,6 +170,22 @@ export async function POST(request: NextRequest) {
         key: newUserSong[0].key
       }
     }
+
+    // Log song addition
+    await logActivity({
+      userId: user.id,
+      userEmail: userEmail,
+      action: isNewSong ? 'SONG_ADDED_NEW' : 'SONG_ADDED_EXISTING',
+      category: 'SONGS',
+      details: {
+        songTitle: title,
+        songArtist: artist,
+        genre: genre || null,
+        proficiency: proficiency || 'comfortable',
+        isNewSong
+      },
+      metadata: extractRequestMetadata(request)
+    })
 
     return Response.json(formattedSong, { status: 201 })
   } catch (error) {

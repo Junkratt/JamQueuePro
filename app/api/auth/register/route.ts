@@ -2,9 +2,41 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { logActivity, extractRequestMetadata } from '../../../lib/activity'
 
 const prisma = new PrismaClient()
+
+// Simple activity logging function for this file
+async function logActivity(data: any) {
+  try {
+    const activityId = crypto.randomUUID()
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ActivityLog" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userEmail" TEXT,
+        action TEXT NOT NULL,
+        category TEXT NOT NULL,
+        details TEXT,
+        metadata TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`
+
+    await prisma.$executeRaw`
+      INSERT INTO "ActivityLog" (id, "userId", "userEmail", action, category, details, metadata, "createdAt")
+      VALUES (
+        ${activityId}, 
+        ${data.userId || null}, 
+        ${data.userEmail || null}, 
+        ${data.action}, 
+        ${data.category}, 
+        ${JSON.stringify(data.details || {})}, 
+        ${JSON.stringify(data.metadata || {})}, 
+        NOW()
+      )`
+  } catch (error) {
+    // Silently fail
+  }
+}
 
 async function sendVerificationEmail(email: string, token: string) {
   const verificationUrl = `${process.env.NEXTAUTH_URL}/auth/verify?token=${token}`
@@ -82,7 +114,7 @@ export async function POST(request: NextRequest) {
         action: 'REGISTRATION_FAILED',
         category: 'AUTH',
         details: { reason: 'Missing required fields' },
-        metadata: extractRequestMetadata(request)
+        metadata: { path: '/api/auth/register', method: 'POST' }
       })
       
       return NextResponse.json(
@@ -99,7 +131,7 @@ export async function POST(request: NextRequest) {
         action: 'REGISTRATION_FAILED',
         category: 'AUTH',
         details: { reason: 'Invalid email format' },
-        metadata: extractRequestMetadata(request)
+        metadata: { path: '/api/auth/register', method: 'POST' }
       })
       
       return NextResponse.json(
@@ -115,7 +147,7 @@ export async function POST(request: NextRequest) {
         action: 'REGISTRATION_FAILED',
         category: 'AUTH',
         details: { reason: 'Password too short' },
-        metadata: extractRequestMetadata(request)
+        metadata: { path: '/api/auth/register', method: 'POST' }
       })
       
       return NextResponse.json(
@@ -136,7 +168,7 @@ export async function POST(request: NextRequest) {
           action: 'REGISTRATION_FAILED',
           category: 'AUTH',
           details: { reason: 'Email already exists and verified' },
-          metadata: extractRequestMetadata(request)
+          metadata: { path: '/api/auth/register', method: 'POST' }
         })
         
         return NextResponse.json(
@@ -164,7 +196,7 @@ export async function POST(request: NextRequest) {
           action: 'VERIFICATION_EMAIL_RESENT',
           category: 'AUTH',
           details: { emailSent },
-          metadata: extractRequestMetadata(request)
+          metadata: { path: '/api/auth/register', method: 'POST' }
         })
         
         return NextResponse.json({
@@ -200,7 +232,7 @@ export async function POST(request: NextRequest) {
       action: 'USER_REGISTERED',
       category: 'AUTH',
       details: { name, emailSent },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/auth/register', method: 'POST' }
     })
 
     return NextResponse.json({
@@ -213,11 +245,11 @@ export async function POST(request: NextRequest) {
     console.error('Registration error:', error)
     
     await logActivity({
-      userEmail: request.url, // Fallback identifier
+      userEmail: 'unknown',
       action: 'REGISTRATION_ERROR',
       category: 'AUTH',
       details: { error: error instanceof Error ? error.message : 'Unknown error' },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/auth/register', method: 'POST' }
     })
     
     return NextResponse.json(

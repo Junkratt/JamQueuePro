@@ -1,8 +1,42 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
+
+// Simple activity logging function for this file
+async function logActivity(data: any) {
+  try {
+    const crypto = require('crypto')
+    const activityId = crypto.randomUUID()
+    
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ActivityLog" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userEmail" TEXT,
+        action TEXT NOT NULL,
+        category TEXT NOT NULL,
+        details TEXT,
+        metadata TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`
+
+    await prisma.$executeRaw`
+      INSERT INTO "ActivityLog" (id, "userId", "userEmail", action, category, details, metadata, "createdAt")
+      VALUES (
+        ${activityId}, 
+        ${data.userId || null}, 
+        ${data.userEmail || null}, 
+        ${data.action}, 
+        ${data.category}, 
+        ${JSON.stringify(data.details || {})}, 
+        ${JSON.stringify(data.metadata || {})}, 
+        NOW()
+      )`
+  } catch (error) {
+    // Silently fail
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,7 +57,7 @@ export async function GET(request: NextRequest) {
       userEmail: users[0].email,
       action: 'PROFILE_VIEWED',
       category: 'PROFILE',
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/user/profile', method: 'GET' }
     })
 
     return Response.json(users[0])
@@ -95,7 +129,7 @@ export async function PUT(request: NextRequest) {
         instrumentCount: (data.instruments || []).length,
         genreCount: (data.musicPrefs || []).length
       },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/user/profile', method: 'PUT' }
     })
 
     console.log('Profile updated successfully:', updatedUser)

@@ -1,8 +1,42 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
-import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
+
+// Simple activity logging function for this file
+async function logActivity(data: any) {
+  try {
+    const crypto = require('crypto')
+    const activityId = crypto.randomUUID()
+    
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ActivityLog" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userEmail" TEXT,
+        action TEXT NOT NULL,
+        category TEXT NOT NULL,
+        details TEXT,
+        metadata TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`
+
+    await prisma.$executeRaw`
+      INSERT INTO "ActivityLog" (id, "userId", "userEmail", action, category, details, metadata, "createdAt")
+      VALUES (
+        ${activityId}, 
+        ${data.userId || null}, 
+        ${data.userEmail || null}, 
+        ${data.action}, 
+        ${data.category}, 
+        ${JSON.stringify(data.details || {})}, 
+        ${JSON.stringify(data.metadata || {})}, 
+        NOW()
+      )`
+  } catch (error) {
+    // Silently fail
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,7 +88,7 @@ export async function POST(request: NextRequest) {
         housebandSongCount: (data.housebandSongs || []).length,
         maxCapacity: data.maxCapacity || null
       },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/events', method: 'POST' }
     })
 
     return Response.json(event, { status: 201 })
@@ -100,7 +134,7 @@ export async function GET(request: NextRequest) {
       action: 'EVENTS_LIST_VIEWED',
       category: 'EVENTS',
       details: { eventCount: events.length },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/events', method: 'GET' }
     })
 
     return Response.json(events)

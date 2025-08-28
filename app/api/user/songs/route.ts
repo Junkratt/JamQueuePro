@@ -1,9 +1,42 @@
 import { NextRequest } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import crypto from 'crypto'
-import { logActivity, extractRequestMetadata } from '../../lib/activity'
 
 const prisma = new PrismaClient()
+
+// Simple activity logging function for this file
+async function logActivity(data: any) {
+  try {
+    const activityId = crypto.randomUUID()
+    
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ActivityLog" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userEmail" TEXT,
+        action TEXT NOT NULL,
+        category TEXT NOT NULL,
+        details TEXT,
+        metadata TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`
+
+    await prisma.$executeRaw`
+      INSERT INTO "ActivityLog" (id, "userId", "userEmail", action, category, details, metadata, "createdAt")
+      VALUES (
+        ${activityId}, 
+        ${data.userId || null}, 
+        ${data.userEmail || null}, 
+        ${data.action}, 
+        ${data.category}, 
+        ${JSON.stringify(data.details || {})}, 
+        ${JSON.stringify(data.metadata || {})}, 
+        NOW()
+      )`
+  } catch (error) {
+    // Silently fail
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,7 +100,7 @@ export async function GET(request: NextRequest) {
       action: 'SONGS_LIBRARY_VIEWED',
       category: 'SONGS',
       details: { songCount: formattedSongs.length },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/user/songs', method: 'GET' }
     })
 
     return Response.json(formattedSongs)
@@ -184,7 +217,7 @@ export async function POST(request: NextRequest) {
         proficiency: proficiency || 'comfortable',
         isNewSong
       },
-      metadata: extractRequestMetadata(request)
+      metadata: { path: '/api/user/songs', method: 'POST' }
     })
 
     return Response.json(formattedSong, { status: 201 })

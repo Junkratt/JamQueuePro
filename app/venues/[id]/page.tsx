@@ -6,13 +6,54 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Navigation from '../../components/Navigation'
 
+interface Venue {
+  id: string
+  name: string
+  address: string
+  city: string
+  state: string
+  zipCode: string
+  phone?: string
+  website?: string
+  description?: string
+  capacity?: number
+  venuePhoto?: string
+  instrumentsProvided?: string[]
+  hasPASystem?: boolean
+  jamNightDetails?: string
+  organizerId?: string
+  amenities?: string[]
+}
+
+interface Organizer {
+  id: string
+  name: string
+  nickname?: string
+  email: string
+  location?: string
+  bio?: string
+  profileImage?: string
+}
+
+interface Event {
+  id: string
+  title: string
+  description?: string
+  dateTime: string
+  duration: number
+  type: string
+  _count?: {
+    signups: number
+  }
+}
+
 export default function VenueProfile() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const params = useParams()
-  const [venue, setVenue] = useState<any>(null)
-  const [organizer, setOrganizer] = useState<any>(null)
-  const [upcomingEvents, setUpcomingEvents] = useState([])
+  const [venue, setVenue] = useState<Venue | null>(null)
+  const [organizer, setOrganizer] = useState<Organizer | null>(null)
+  const [upcomingEvents, setUpcomingEvents] = useState<Event[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -29,7 +70,6 @@ export default function VenueProfile() {
         const venueData = await response.json()
         setVenue(venueData)
         
-        // Fetch organizer details if available
         if (venueData.organizerId) {
           fetchOrganizer(venueData.organizerId)
         }
@@ -99,7 +139,6 @@ export default function VenueProfile() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       <Navigation />
-
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
         <div style={{ 
           backgroundColor: 'white', 
@@ -109,7 +148,12 @@ export default function VenueProfile() {
           overflow: 'hidden'
         }}>
           {venue.venuePhoto && (
-            <div style={{ height: '200px', backgroundImage: `url(${venue.venuePhoto})`, backgroundSize: 'cover', backgroundPosition: 'center' }}></div>
+            <div style={{ 
+              height: '200px', 
+              backgroundImage: `url(${venue.venuePhoto})`, 
+              backgroundSize: 'cover', 
+              backgroundPosition: 'center' 
+            }}></div>
           )}
           
           <div style={{ padding: '2rem' }}>
@@ -125,12 +169,19 @@ export default function VenueProfile() {
                   </p>
                   {venue.phone && (
                     <p style={{ marginBottom: '0.25rem' }}>
-                      📞 <a href={`tel:${venue.phone}`} style={{ color: '#2563eb', textDecoration: 'none' }}>{venue.phone}</a>
+                      📞 <a href={`tel:${venue.phone}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+                        {venue.phone}
+                      </a>
                     </p>
                   )}
                   {venue.website && (
                     <p style={{ marginBottom: '0.25rem' }}>
-                      🌐 <a href={venue.website} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
+                      🌐 <a 
+                        href={venue.website} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        style={{ color: '#2563eb', textDecoration: 'none' }}
+                      >
                         Visit Website
                       </a>
                     </p>
@@ -146,8 +197,15 @@ export default function VenueProfile() {
 
               <div style={{ textAlign: 'right' }}>
                 {venue.capacity && (
-                  <div style={{ padding: '1rem', backgroundColor: '#f3f4f6', borderRadius: '0.375rem', marginBottom: '1rem' }}>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>{venue.capacity}</div>
+                  <div style={{ 
+                    padding: '1rem', 
+                    backgroundColor: '#f3f4f6', 
+                    borderRadius: '0.375rem', 
+                    marginBottom: '1rem' 
+                  }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>
+                      {venue.capacity}
+                    </div>
                     <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>Capacity</div>
                   </div>
                 )}
@@ -181,41 +239,44 @@ export default function VenueProfile() {
                 borderRadius: '0.5rem',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
               }}>
-                <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', display: 'flex', alignItems: 'center' }}>
+                <h2 style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: '600', 
+                  marginBottom: '1rem', 
+                  display: 'flex', 
+                  alignItems: 'center' 
+                }}>
                   🎤 Jam Queue Pro Organizer
                 </h2>
                 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  {organizer.profileImage ? (
-                    <img
-                      src={organizer.profileImage}
-                      alt={organizer.name}
-                      style={{ width: '60px', height: '60px', borderRadius: '50%', objectFit: 'cover' }}
-                    />
-                  ) : (
-                    <div style={{
-                      width: '60px',
-                      height: '60px',
-                      borderRadius: '50%',
-                      backgroundColor: '#f3f4f6',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.5rem'
-                    }}>
-                      👤
-                    </div>
-                  )}
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '50%',
+                    backgroundColor: '#f3f4f6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem'
+                  }}>
+                    👤
+                  </div>
                   
                   <div style={{ flex: 1 }}>
                     <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.25rem' }}>
-                      <Link href={`/organizers/${encodeURIComponent(organizer.email)}`} style={{ color: '#2563eb', textDecoration: 'none' }}>
+                      <Link 
+                        href={`/organizers/${encodeURIComponent(organizer.email)}`} 
+                        style={{ color: '#2563eb', textDecoration: 'none' }}
+                      >
                         {organizer.nickname || organizer.name}
                       </Link>
                     </h3>
-                    <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                      {organizer.location && `📍 ${organizer.location}`}
-                    </p>
+                    {organizer.location && (
+                      <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
+                        📍 {organizer.location}
+                      </p>
+                    )}
                     {organizer.bio && (
                       <p style={{ color: '#374151', fontSize: '0.875rem' }}>
                         {organizer.bio.substring(0, 150)}...
@@ -294,7 +355,7 @@ export default function VenueProfile() {
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {upcomingEvents.map((event: any) => (
+                  {upcomingEvents.map((event: Event) => (
                     <div key={event.id} style={{
                       padding: '1.5rem',
                       border: '1px solid #e5e7eb',
@@ -304,12 +365,16 @@ export default function VenueProfile() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
                         <div style={{ flex: 1 }}>
                           <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                            <Link href={`/events/${event.id}`} style={{ color: '#1f2937', textDecoration: 'none' }}>
+                            <Link 
+                              href={`/events/${event.id}`} 
+                              style={{ color: '#1f2937', textDecoration: 'none' }}
+                            >
                               {event.title}
                             </Link>
                           </h3>
                           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
-                            🗓️ {new Date(event.dateTime).toLocaleDateString()} at {new Date(event.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            🗓️ {new Date(event.dateTime).toLocaleDateString()} at {' '}
+                            {new Date(event.dateTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                           </p>
                           <p style={{ color: '#6b7280', fontSize: '0.875rem', marginBottom: '0.5rem' }}>
                             🎸 {event.type.replace('_', ' ')} • ⏱️ {event.duration} minutes
@@ -500,33 +565,6 @@ export default function VenueProfile() {
                 >
                   ← Back to Venues
                 </Link>
-              </div>
-            </div>
-
-            <div style={{ 
-              backgroundColor: 'white', 
-              padding: '2rem', 
-              borderRadius: '0.5rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
-                📊 Venue Stats
-              </h3>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#2563eb' }}>
-                    {upcomingEvents.length}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Upcoming Events</div>
-                </div>
-                
-                <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981' }}>
-                    {upcomingEvents.reduce((sum: number, event: any) => sum + (event._count?.signups || 0), 0)}
-                  </div>
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Total Signups</div>
-                </div>
               </div>
             </div>
           </div>

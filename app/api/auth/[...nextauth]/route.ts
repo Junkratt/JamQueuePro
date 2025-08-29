@@ -77,8 +77,7 @@ const handler = NextAuth({
     strategy: 'jwt'
   },
   pages: {
-    signIn: '/auth/signin',
-    signUp: '/auth/signup'
+    signIn: '/auth/signin'
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -88,13 +87,13 @@ const handler = NextAuth({
       return token
     },
     async session({ session, token }) {
-      if (token) {
+      if (token && session.user) {
         session.user.id = token.id as string
       }
       return session
     }
   },
-  debug: true // Enable debug logging
+  debug: process.env.NODE_ENV === 'development'
 })
 
 export { handler as GET, handler as POST }

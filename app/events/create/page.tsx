@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Navigation from '../../components/Navigation'
@@ -8,20 +8,22 @@ import Navigation from '../../components/Navigation'
 export default function CreateEvent() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [venues, setVenues] = useState([])
   const [event, setEvent] = useState({
     title: '',
     description: '',
-    venueId: '',
     dateTime: '',
-    duration: 240,
-    type: 'open_mic',
+    duration: '240',
+    type: 'open_jam',
     maxCapacity: '',
     signupDeadline: '',
     houseband: false,
-    housebandSongs: [] as string[]
+    housebandSongs: [] as string[],
+    venueId: '',
+    organizerEmail: ''
   })
-  const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -30,32 +32,75 @@ export default function CreateEvent() {
       router.push('/auth/signin')
       return
     }
-    
+    checkUserRole()
     fetchVenues()
   }, [session, status, router])
+
+  const checkUserRole = async () => {
+    try {
+      // Check if user has admin role
+      const adminResponse = await fetch(`/api/admin/users?adminEmail=${session?.user?.email}&limit=1`)
+      if (adminResponse.ok) {
+        setUserRole('admin')
+        setEvent(prev => ({ ...prev, organizerEmail: session?.user?.email || '' }))
+        setIsLoading(false)
+        return
+      }
+
+      // Check if user has created venues before (organizer)
+      const venuesResponse = await fetch('/api/venues')
+      if (venuesResponse.ok) {
+        const venues = await venuesResponse.json()
+        const userVenues = venues.filter((venue: any) => 
+          venue.organizerId === session?.user?.email || 
+          venue.ownerId === session?.user?.email
+        )
+        
+        if (userVenues.length > 0) {
+          setUserRole('organizer')
+          setEvent(prev => ({ ...prev, organizerEmail: session?.user?.email || '' }))
+        } else {
+          setUserRole('performer')
+        }
+      } else {
+        setUserRole('performer')
+      }
+    } catch (error) {
+      console.error('Failed to check user role:', error)
+      setUserRole('performer')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const fetchVenues = async () => {
     try {
       const response = await fetch('/api/venues')
       if (response.ok) {
-        const venueData = await response.json()
-        setVenues(venueData)
+        const venuesData = await response.json()
+        setVenues(venuesData)
       }
     } catch (error) {
-      console.error('Failed to load venues:', error)
+      console.error('Failed to fetch venues:', error)
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
     setMessage('')
+
+    if (userRole === 'performer') {
+      setMessage('Only venue owners and organizers can create events. Please contact support if you believe this is an error.')
+      return
+    }
 
     try {
       const eventData = {
         ...event,
+        duration: parseInt(event.duration),
         maxCapacity: event.maxCapacity ? parseInt(event.maxCapacity) : null,
-        organizerEmail: session?.user?.email
+        signupDeadline: event.signupDeadline ? new Date(event.signupDeadline).toISOString() : null,
+        dateTime: new Date(event.dateTime).toISOString()
       }
 
       const response = await fetch('/api/events', {
@@ -71,84 +116,121 @@ export default function CreateEvent() {
       if (response.ok) {
         setMessage('Event created successfully!')
         setTimeout(() => {
-          router.push('/events')
+          router.push(`/events/${data.id}`)
         }, 2000)
       } else {
         setMessage(`Failed to create event: ${data.error || 'Unknown error'}`)
       }
     } catch (error) {
       setMessage('Network error. Please try again.')
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  const addSong = (song: string) => {
-    if (song && !event.housebandSongs.includes(song)) {
-      setEvent({
-        ...event,
-        housebandSongs: [...event.housebandSongs, song]
-      })
-    }
-  }
-
-  const removeSong = (song: string) => {
-    setEvent({
-      ...event,
-      housebandSongs: event.housebandSongs.filter(s => s !== song)
-    })
-  }
-
-  if (status === 'loading') {
+  if (status === 'loading' || isLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Loading...
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <Navigation />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎵</div>
+            <div>Loading...</div>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!session) return null
 
+  // Block access for performers
+  if (userRole === 'performer') {
+    return (
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <Navigation />
+        <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem', textAlign: 'center' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', padding: '3rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🚫</div>
+            <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem', color: '#1f2937' }}>
+              Access Restricted
+            </h1>
+            <p style={{ color: '#6b7280', marginBottom: '2rem', lineHeight: '1.6' }}>
+              Event creation is currently limited to venue owners and event organizers. 
+              This ensures events are created by authorized personnel who can manage them properly.
+            </p>
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => router.push('/dashboard')}
+                style={{
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.375rem',
+                  border: 'none',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
+              >
+                Back to Dashboard
+              </button>
+              <button
+                onClick={() => router.push('/events')}
+                style={{
+                  backgroundColor: '#f3f4f6',
+                  color: '#374151',
+                  padding: '0.75rem 1.5rem',
+                  borderRadius: '0.375rem',
+                  border: '1px solid #d1d5db',
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Browse Events
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       <Navigation />
 
-      <div style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '2rem', textAlign: 'center' }}>
-          Create Jam Session
-        </h1>
+      <main style={{ maxWidth: '800px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+            Create Jam Session
+          </h1>
+          <p style={{ color: '#6b7280' }}>
+            Schedule a new jam session for musicians to enjoy
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit}>
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Event Details</h2>
-            
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                Event Title *
-              </label>
-              <input
-                type="text"
-                required
-                value={event.title}
-                onChange={(e) => setEvent({ ...event, title: e.target.value })}
-                placeholder="e.g., Open Mic Night, Blues Jam Session"
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '1rem'
-                }}
-              />
-            </div>
+          <div style={{ backgroundColor: 'white', padding: '2rem', borderRadius: '0.5rem', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'grid', gap: '1rem' }}>
+              <div>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  Event Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={event.title}
+                  onChange={(e) => setEvent({ ...event, title: e.target.value })}
+                  placeholder="Thursday Night Open Jam"
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+              </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div>
                 <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
                   Venue *
@@ -174,227 +256,48 @@ export default function CreateEvent() {
                 </select>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Event Type *
-                </label>
-                <select
-                  value={event.type}
-                  onChange={(e) => setEvent({ ...event, type: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                >
-                  <option value="open_mic">Open Mic</option>
-                  <option value="full_band">Full Band Jam</option>
-                  <option value="songwriter">Songwriter Night</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Date & Time *
-                </label>
-                <input
-                  type="datetime-local"
-                  required
-                  value={event.dateTime}
-                  onChange={(e) => setEvent({ ...event, dateTime: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Duration (minutes)
-                </label>
-                <input
-                  type="number"
-                  value={event.duration}
-                  onChange={(e) => setEvent({ ...event, duration: parseInt(e.target.value) || 240 })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                Description
-              </label>
-              <textarea
-                value={event.description}
-                onChange={(e) => setEvent({ ...event, description: e.target.value })}
-                placeholder="Describe your event, what musicians should expect..."
-                rows={3}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  fontSize: '1rem',
-                  resize: 'vertical'
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            marginBottom: '2rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
-          }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>Additional Options</h2>
-            
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Max Performers
-                </label>
-                <input
-                  type="number"
-                  value={event.maxCapacity}
-                  onChange={(e) => setEvent({ ...event, maxCapacity: e.target.value })}
-                  placeholder="Leave empty for unlimited"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Signup Deadline
-                </label>
-                <input
-                  type="datetime-local"
-                  value={event.signupDeadline}
-                  onChange={(e) => setEvent({ ...event, signupDeadline: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '0.375rem',
-                    fontSize: '1rem'
-                  }}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={event.houseband}
-                  onChange={(e) => setEvent({ ...event, houseband: e.target.checked })}
-                  style={{ marginRight: '0.5rem' }}
-                />
-                <span style={{ fontWeight: '500' }}>House band available to accompany performers</span>
-              </label>
-            </div>
-
-            {event.houseband && (
-              <div>
-                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
-                  Songs the house band knows
-                </label>
-                
-                <div style={{ display: 'flex', marginBottom: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    Date & Time *
+                  </label>
                   <input
-                    type="text"
-                    placeholder="Add a song..."
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addSong((e.target as HTMLInputElement).value)
-                        ;(e.target as HTMLInputElement).value = ''
-                      }
-                    }}
+                    type="datetime-local"
+                    required
+                    value={event.dateTime}
+                    onChange={(e) => setEvent({ ...event, dateTime: e.target.value })}
                     style={{
-                      flex: 1,
+                      width: '100%',
                       padding: '0.75rem',
                       border: '1px solid #d1d5db',
-                      borderRadius: '0.375rem 0 0 0.375rem',
+                      borderRadius: '0.375rem',
                       fontSize: '1rem'
                     }}
                   />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                      addSong(input.value)
-                      input.value = ''
-                    }}
-                    style={{
-                      padding: '0.75rem 1rem',
-                      backgroundColor: '#2563eb',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0 0.375rem 0.375rem 0',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Add
-                  </button>
                 </div>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {event.housebandSongs.map(song => (
-                    <span
-                      key={song}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '0.25rem 0.75rem',
-                        backgroundColor: '#dbeafe',
-                        color: '#1e40af',
-                        borderRadius: '9999px',
-                        fontSize: '0.875rem'
-                      }}
-                    >
-                      {song}
-                      <button
-                        type="button"
-                        onClick={() => removeSong(song)}
-                        style={{
-                          marginLeft: '0.5rem',
-                          background: 'none',
-                          border: 'none',
-                          color: '#1e40af',
-                          cursor: 'pointer',
-                          fontSize: '1rem'
-                        }}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
+                <div>
+                  <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                    Duration (minutes)
+                  </label>
+                  <input
+                    type="number"
+                    value={event.duration}
+                    onChange={(e) => setEvent({ ...event, duration: e.target.value })}
+                    placeholder="240"
+                    min="60"
+                    max="480"
+                    style={{
+                      width: '100%',
+                      padding: '0.75rem',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '0.375rem',
+                      fontSize: '1rem'
+                    }}
+                  />
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {message && (
@@ -412,23 +315,22 @@ export default function CreateEvent() {
           <div style={{ textAlign: 'center' }}>
             <button
               type="submit"
-              disabled={isLoading}
               style={{
-                backgroundColor: isLoading ? '#9ca3af' : '#2563eb',
+                backgroundColor: '#2563eb',
                 color: 'white',
                 padding: '0.75rem 2rem',
                 borderRadius: '0.375rem',
                 border: 'none',
                 fontSize: '1rem',
                 fontWeight: '500',
-                cursor: isLoading ? 'not-allowed' : 'pointer'
+                cursor: 'pointer'
               }}
             >
-              {isLoading ? 'Creating...' : 'Create Event'}
+              Create Event
             </button>
           </div>
         </form>
-      </div>
+      </main>
     </div>
   )
 }

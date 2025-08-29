@@ -7,92 +7,85 @@ import Link from 'next/link'
 import Navigation from '../components/Navigation'
 
 export default function Dashboard() {
-  const [mounted, setMounted] = useState(false)
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [stats, setStats] = useState({
-    upcomingEvents: 0,
-    userSignups: 0,
-    totalVenues: 0,
-    userSongs: 0
-  })
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [recentActivity, setRecentActivity] = useState([])
+  const [upcomingEvents, setUpcomingEvents] = useState([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (mounted && status !== 'loading' && !session) {
+    if (status === 'loading') return
+    if (!session) {
       router.push('/auth/signin')
+      return
     }
-    if (mounted && session) {
-      fetchDashboardStats()
-    }
-  }, [session, status, router, mounted])
+    
+    fetchUserRole()
+    fetchDashboardData()
+  }, [session, status, router])
 
-  const fetchDashboardStats = async () => {
+  const fetchUserRole = async () => {
     try {
-      // Fetch events count
-      const eventsResponse = await fetch('/api/events')
-      const eventsData = eventsResponse.ok ? await eventsResponse.json() : []
-      
-      // Fetch venues count
-      const venuesResponse = await fetch('/api/venues')
-      const venuesData = venuesResponse.ok ? await venuesResponse.json() : []
-      
-      // Fetch user's songs count
-      let userSongsCount = 0
-      if (session?.user?.email) {
-        const songsResponse = await fetch(`/api/user/songs?email=${session.user.email}`)
-        const songsData = songsResponse.ok ? await songsResponse.json() : []
-        userSongsCount = songsData.length
+      // Check if user has admin role by trying admin endpoint
+      const adminResponse = await fetch(`/api/admin/users?adminEmail=${session?.user?.email}&limit=1`)
+      if (adminResponse.ok) {
+        setUserRole('admin')
+        return
       }
 
-      // Count user's signups across all events
-      let userSignupsCount = 0
-      if (eventsData.length > 0 && session?.user?.email) {
-        for (const event of eventsData) {
-          try {
-            const signupsResponse = await fetch(`/api/events/${event.id}/signups`)
-            if (signupsResponse.ok) {
-              const signupsData = await signupsResponse.json()
-              const userSignup = signupsData.find((signup: any) => 
-                signup.user?.email === session.user.email
-              )
-              if (userSignup) userSignupsCount++
-            }
-          } catch (error) {
-            console.error('Error fetching signups for event:', event.id)
+      // Check user profile for role information
+      const profileResponse = await fetch('/api/user/profile')
+      if (profileResponse.ok) {
+        const profileData = await profileResponse.json()
+        
+        // Check if user has created any venues (making them an organizer)
+        const venuesResponse = await fetch('/api/venues')
+        if (venuesResponse.ok) {
+          const venues = await venuesResponse.json()
+          const userVenues = venues.filter((venue: any) => 
+            venue.organizerId === session?.user?.email || 
+            venue.ownerId === session?.user?.email
+          )
+          
+          if (userVenues.length > 0) {
+            setUserRole('organizer')
+          } else {
+            setUserRole('performer')
           }
+        } else {
+          setUserRole('performer')
         }
+      } else {
+        setUserRole('performer')
       }
-
-      setStats({
-        upcomingEvents: eventsData.length || 0,
-        userSignups: userSignupsCount,
-        totalVenues: venuesData.length || 0,
-        userSongs: userSongsCount
-      })
     } catch (error) {
-      console.error('Failed to fetch dashboard stats:', error)
-      setStats({
-        upcomingEvents: 0,
-        userSignups: 0,
-        totalVenues: 0,
-        userSongs: 0
-      })
+      console.error('Failed to fetch user role:', error)
+      setUserRole('performer')
+    }
+  }
+
+  const fetchDashboardData = async () => {
+    try {
+      // This is placeholder - in real app would fetch user-specific data
+      setRecentActivity([])
+      setUpcomingEvents([])
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  if (!mounted || status === 'loading' || isLoading) {
+  if (status === 'loading' || isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <div className="w-4 h-4 bg-blue-600 rounded-full animate-pulse"></div>
-          <div className="text-gray-600">Loading...</div>
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <Navigation />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>🎵</div>
+            <div>Loading your dashboard...</div>
+          </div>
         </div>
       </div>
     )
@@ -100,220 +93,245 @@ export default function Dashboard() {
 
   if (!session) return null
 
+  const QuickActionCard = ({ icon, title, description, href, disabled = false }: any) => (
+    <div style={{
+      backgroundColor: 'white',
+      border: disabled ? '2px dashed #e5e7eb' : '1px solid #e5e7eb',
+      borderRadius: '0.5rem',
+      padding: '1.5rem',
+      opacity: disabled ? 0.6 : 1,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      transition: 'all 0.2s'
+    }}>
+      <Link
+        href={disabled ? '#' : href}
+        style={{
+          textDecoration: 'none',
+          color: 'inherit',
+          display: 'block',
+          pointerEvents: disabled ? 'none' : 'auto'
+        }}
+        onClick={(e) => disabled && e.preventDefault()}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
+          <div style={{
+            width: '3rem',
+            height: '3rem',
+            backgroundColor: disabled ? '#f3f4f6' : '#dbeafe',
+            borderRadius: '0.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '1.5rem'
+          }}>
+            {icon}
+          </div>
+          <div style={{ flex: 1 }}>
+            <h3 style={{ 
+              fontSize: '1.125rem', 
+              fontWeight: '600', 
+              marginBottom: '0.5rem',
+              color: disabled ? '#6b7280' : '#1f2937'
+            }}>
+              {title}
+            </h3>
+            <p style={{ 
+              fontSize: '0.875rem', 
+              color: '#6b7280', 
+              lineHeight: '1.4' 
+            }}>
+              {description}
+            </p>
+          </div>
+          {!disabled && (
+            <div style={{ color: '#6b7280', fontSize: '1.25rem' }}>→</div>
+          )}
+        </div>
+      </Link>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
       <Navigation />
 
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {session.user?.name?.split(' ')[0] || 'Musician'}!
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1f2937' }}>
+            Welcome back, {session.user?.name?.split(' ')[0] || session.user?.email?.split('@')[0]}!
           </h1>
-          <p className="mt-2 text-gray-600">
-            Manage your jam sessions, discover venues, and connect with the music community.
+          <p style={{ color: '#6b7280' }}>
+            Role: <span style={{
+              backgroundColor: userRole === 'admin' ? '#fef3c7' : userRole === 'organizer' ? '#dbeafe' : '#d1fae5',
+              color: userRole === 'admin' ? '#92400e' : userRole === 'organizer' ? '#1e40af' : '#065f46',
+              padding: '0.25rem 0.75rem',
+              borderRadius: '9999px',
+              fontSize: '0.875rem',
+              fontWeight: '500'
+            }}>
+              {userRole}
+            </span>
           </p>
         </div>
 
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
+          {/* Performer Actions - Available to Everyone */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center' }}>
+              🎤 Performer Tools
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <QuickActionCard
+                icon="🎵"
+                title="Browse Jam Sessions"
+                description="Find and sign up for jam sessions in your area"
+                href="/events"
+              />
+              <QuickActionCard
+                icon="🎸"
+                title="My Song Library"
+                description="Manage your repertoire and skill levels"
+                href="/profile/songs"
+              />
+              <QuickActionCard
+                icon="👤"
+                title="Update Profile"
+                description="Keep your musical profile current"
+                href="/profile"
+              />
+            </div>
+          </div>
+
+          {/* Venue Owner Tools - Only for Organizers and Admins */}
+          <div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center' }}>
+              🏪 Venue Owner Tools
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <QuickActionCard
+                icon="🏪"
+                title="Register Your Venue"
+                description={userRole === 'organizer' || userRole === 'admin' 
+                  ? "Add your venue to the platform" 
+                  : "Available for venue owners and organizers"}
+                href="/venues/register"
+                disabled={userRole === 'performer'}
+              />
+              <QuickActionCard
+                icon="✨"
+                title="Create Jam Session"
+                description={userRole === 'organizer' || userRole === 'admin'
+                  ? "Schedule events at your venue"
+                  : "Available for venue owners and organizers"}
+                href="/events/create"
+                disabled={userRole === 'performer'}
+              />
+              <QuickActionCard
+                icon="📊"
+                title="Event Analytics"
+                description={userRole === 'organizer' || userRole === 'admin'
+                  ? "Coming soon - Track your event performance"
+                  : "Available for venue owners and organizers"}
+                href="#"
+                disabled={true}
+              />
+            </div>
+          </div>
+
+          {/* Admin Tools - Only for Admins */}
+          {userRole === 'admin' && (
+            <div>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937', display: 'flex', alignItems: 'center' }}>
+                ⚙️ Admin Tools
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <QuickActionCard
+                  icon="👥"
+                  title="User Management"
+                  description="Manage user accounts and roles"
+                  href="/admin/users"
+                />
+                <QuickActionCard
+                  icon="📈"
+                  title="Platform Analytics"
+                  description="View platform usage and activity"
+                  href="/admin/activity"
+                />
+                <QuickActionCard
+                  icon="🎯"
+                  title="Admin Dashboard"
+                  description="Platform overview and settings"
+                  href="/admin"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <span className="text-blue-600 text-lg">🎵</span>
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Upcoming Events</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.upcomingEvents}</p>
-                </div>
-              </div>
+        <div style={{ 
+          backgroundColor: 'white', 
+          borderRadius: '0.5rem', 
+          padding: '2rem', 
+          marginTop: '2rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+        }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem', color: '#1f2937' }}>
+            Platform Overview
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+            <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#2563eb' }}>🎵</div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>Find Jam Sessions</div>
             </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                    <span className="text-green-600 text-lg">🎤</span>
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">My Signups</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.userSignups}</p>
-                </div>
-              </div>
+            <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#10b981' }}>🏪</div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>Browse Venues</div>
             </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <span className="text-purple-600 text-lg">🏪</span>
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Local Venues</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.totalVenues}</p>
-                </div>
-              </div>
+            <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#f59e0b' }}>🎸</div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>Build Repertoire</div>
             </div>
-          </div>
-
-          <div className="bg-white overflow-hidden shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                    <span className="text-orange-600 text-lg">🎶</span>
-                  </div>
-                </div>
-                <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">My Songs</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.userSongs}</p>
-                </div>
-              </div>
+            <div style={{ textAlign: 'center', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '0.375rem' }}>
+              <div style={{ fontSize: '2rem', fontWeight: 'bold', color: '#ef4444' }}>👥</div>
+              <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>Connect Musicians</div>
             </div>
           </div>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Musician Tools */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <span className="mr-2">🎸</span>
-                Musician Tools
-              </h2>
-              <div className="space-y-3">
-                <Link 
-                  href="/events"
-                  className="group flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                      <span className="text-blue-600">🎵</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Browse Jam Sessions</h3>
-                      <p className="text-sm text-gray-500">Find and sign up for local jam nights</p>
-                    </div>
-                  </div>
-                  <span className="text-gray-400 group-hover:text-blue-600 transition-colors">→</span>
-                </Link>
-
-                <Link 
-                  href="/venues/search"
-                  className="group flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-green-300 hover:bg-green-50 transition-all duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors">
-                      <span className="text-green-600">📍</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Find Local Venues</h3>
-                      <p className="text-sm text-gray-500">Discover venues near you</p>
-                    </div>
-                  </div>
-                  <span className="text-gray-400 group-hover:text-green-600 transition-colors">→</span>
-                </Link>
-
-                <Link 
-                  href="/profile"
-                  className="group flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-purple-300 hover:bg-purple-50 transition-all duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors">
-                      <span className="text-purple-600">👤</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Update Profile</h3>
-                      <p className="text-sm text-gray-500">Manage your musician profile</p>
-                    </div>
-                  </div>
-                  <span className="text-gray-400 group-hover:text-purple-600 transition-colors">→</span>
-                </Link>
-              </div>
-            </div>
+        {/* Role Upgrade Call-to-Action for Performers */}
+        {userRole === 'performer' && (
+          <div style={{ 
+            backgroundColor: '#dbeafe', 
+            borderRadius: '0.5rem', 
+            padding: '2rem', 
+            marginTop: '2rem',
+            border: '1px solid #93c5fd'
+          }}>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem', color: '#1e40af' }}>
+              🎪 Want to Host Jam Sessions?
+            </h3>
+            <p style={{ color: '#1e40af', marginBottom: '1rem', lineHeight: '1.5' }}>
+              Ready to take your musical journey to the next level? Register your venue and start hosting jam sessions to build the local music community!
+            </p>
+            <Link
+              href="/venues/register"
+              style={{
+                display: 'inline-block',
+                backgroundColor: '#2563eb',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                borderRadius: '0.375rem',
+                textDecoration: 'none',
+                fontSize: '0.875rem',
+                fontWeight: '500'
+              }}
+            >
+              🏪 Become a Venue Organizer
+            </Link>
           </div>
-
-          {/* Venue Owner Tools */}
-          <div className="bg-white shadow-sm rounded-lg border border-gray-200">
-            <div className="p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <span className="mr-2">🏪</span>
-                Venue Owner Tools
-              </h2>
-              <div className="space-y-3">
-                <Link 
-                  href="/venues/register"
-                  className="group flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-orange-300 hover:bg-orange-50 transition-all duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center group-hover:bg-orange-200 transition-colors">
-                      <span className="text-orange-600">🏪</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Register Your Venue</h3>
-                      <p className="text-sm text-gray-500">Add your venue to the platform</p>
-                    </div>
-                  </div>
-                  <span className="text-gray-400 group-hover:text-orange-600 transition-colors">→</span>
-                </Link>
-
-                <Link 
-                  href="/events/create"
-                  className="group flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-indigo-300 hover:bg-indigo-50 transition-all duration-200"
-                >
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
-                      <span className="text-indigo-600">➕</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">Create Jam Session</h3>
-                      <p className="text-sm text-gray-500">Schedule events at your venue</p>
-                    </div>
-                  </div>
-                  <span className="text-gray-400 group-hover:text-indigo-600 transition-colors">→</span>
-                </Link>
-
-                <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <span className="text-gray-400">📊</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-500">Event Analytics</h3>
-                      <p className="text-sm text-gray-400">Coming soon</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent Activity */}
-        <div className="mt-8 bg-white shadow-sm rounded-lg border border-gray-200">
-          <div className="p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-            <div className="text-center py-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-gray-400 text-2xl">🎵</span>
-              </div>
-              <p className="text-gray-500 mb-2">No recent activity yet</p>
-              <p className="text-sm text-gray-400">
-                Once you start signing up for jam sessions, your activity will appear here.
-              </p>
-            </div>
-          </div>
-        </div>
+        )}
       </main>
     </div>
   )

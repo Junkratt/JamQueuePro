@@ -3,6 +3,13 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+interface ActivityItem {
+  action: string
+  category: string
+  createdAt: Date
+  userEmail: string
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
@@ -21,7 +28,7 @@ export async function GET(request: NextRequest) {
       return Response.json({ error: 'Admin not found' }, { status: 403 })
     }
 
-    // Initialize default stats
+    // Initialize stats with proper types
     const stats = {
       totalUsers: 0,
       totalEvents: 0,
@@ -29,7 +36,7 @@ export async function GET(request: NextRequest) {
       totalSignups: 0,
       recentSignups: 0,
       activeUsers: 0,
-      recentActivity: []
+      recentActivity: [] as ActivityItem[]
     }
 
     try {
@@ -41,24 +48,24 @@ export async function GET(request: NextRequest) {
 
     try {
       // Try to get event count
-      const eventCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Event"`
-      stats.totalEvents = Number((eventCount as any)[0]?.count || 0)
+      const eventCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Event"` as any[]
+      stats.totalEvents = Number(eventCount[0]?.count || 0)
     } catch (error) {
       console.log('Event table query failed - table may not exist:', error)
     }
 
     try {
       // Try to get venue count
-      const venueCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Venue"`
-      stats.totalVenues = Number((venueCount as any)[0]?.count || 0)
+      const venueCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "Venue"` as any[]
+      stats.totalVenues = Number(venueCount[0]?.count || 0)
     } catch (error) {
       console.log('Venue table query failed - table may not exist:', error)
     }
 
     try {
       // Try to get signup count
-      const signupCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "EventSignup"`
-      stats.totalSignups = Number((signupCount as any)[0]?.count || 0)
+      const signupCount = await prisma.$queryRaw`SELECT COUNT(*) as count FROM "EventSignup"` as any[]
+      stats.totalSignups = Number(signupCount[0]?.count || 0)
     } catch (error) {
       console.log('EventSignup table query failed - table may not exist:', error)
     }
@@ -73,10 +80,10 @@ export async function GET(request: NextRequest) {
       ` as any[]
       
       stats.recentActivity = recentActivity.map(activity => ({
-        action: activity.action,
-        category: activity.category,
-        createdAt: activity.createdAt,
-        userEmail: activity.userEmail
+        action: activity.action || 'Unknown',
+        category: activity.category || 'Unknown',
+        createdAt: activity.createdAt || new Date(),
+        userEmail: activity.userEmail || 'Unknown'
       }))
     } catch (error) {
       console.log('ActivityLog table query failed - table may not exist:', error)
@@ -105,7 +112,7 @@ export async function GET(request: NextRequest) {
         WHERE "createdAt" >= ${thirtyDaysAgo}
       ` as any[]
       
-      stats.activeUsers = Number((activeUserCount as any)[0]?.count || 0)
+      stats.activeUsers = Number(activeUserCount[0]?.count || 0)
     } catch (error) {
       console.log('Recent activity query failed:', error)
     }
@@ -123,7 +130,7 @@ export async function GET(request: NextRequest) {
       totalSignups: 0,
       recentSignups: 0,
       activeUsers: 0,
-      recentActivity: [],
+      recentActivity: [] as ActivityItem[],
       error: 'Some database tables may not be initialized yet'
     })
   }

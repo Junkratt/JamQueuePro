@@ -3,6 +3,41 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
+// Simple activity logging function
+async function logActivity(data: any) {
+  try {
+    const crypto = require('crypto')
+    const activityId = crypto.randomUUID()
+    
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "ActivityLog" (
+        id TEXT PRIMARY KEY,
+        "userId" TEXT,
+        "userEmail" TEXT,
+        action TEXT NOT NULL,
+        category TEXT NOT NULL,
+        details TEXT,
+        metadata TEXT,
+        "createdAt" TIMESTAMP DEFAULT NOW()
+      )`
+
+    await prisma.$executeRaw`
+      INSERT INTO "ActivityLog" (id, "userId", "userEmail", action, category, details, metadata, "createdAt")
+      VALUES (
+        ${activityId}, 
+        ${data.userId || null}, 
+        ${data.userEmail || null}, 
+        ${data.action}, 
+        ${data.category}, 
+        ${JSON.stringify(data.details || {})}, 
+        ${JSON.stringify(data.metadata || {})}, 
+        NOW()
+      )`
+  } catch (error) {
+    // Silently fail
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json()
@@ -20,7 +55,7 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Create the venue - remove ownerId for now until schema is updated
+    // Create the venue with new fields
     const venue = await prisma.venue.create({
       data: {
         name: data.name,
@@ -33,9 +68,32 @@ export async function POST(request: NextRequest) {
         website: data.website || null,
         description: data.description || null,
         capacity: data.capacity || null,
-        amenities: data.amenities || []
-        // ownerId: owner.id  // Remove this line temporarily
+        amenities: data.amenities || [],
+        // New fields
+        venuePhoto: data.venuePhoto || null,
+        instrumentsProvided: data.instrumentsProvided || [],
+        hasPASystem: data.hasPASystem || false,
+        jamNightDetails: data.jamNightDetails || null,
+        organizerId: data.organizerId || data.ownerId
       }
+    })
+
+    // Log venue creation
+    await logActivity({
+      userId: owner.id,
+      userEmail: data.ownerId,
+      action: 'VENUE_REGISTERED',
+      category: 'VENUES',
+      details: {
+        venueId: venue.id,
+        venueName: data.name,
+        city: data.city,
+        state: data.state,
+        hasPASystem: data.hasPASystem || false,
+        instrumentCount: (data.instrumentsProvided || []).length,
+        amenityCount: (data.amenities || []).length
+      },
+      metadata: { path: '/api/venues', method: 'POST' }
     })
 
     return Response.json(venue, { status: 201 })

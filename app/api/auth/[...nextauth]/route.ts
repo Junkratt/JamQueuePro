@@ -1,14 +1,11 @@
-import NextAuth, { NextAuthOptions } from 'next-auth'
+import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import FacebookProvider from 'next-auth/providers/facebook'
-import { PrismaAdapter } from "@auth/prisma-adapter"
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma),
+const handler = NextAuth({
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -18,54 +15,70 @@ const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('Missing credentials')
           return null
         }
 
         try {
-          // Find user by email
+          console.log('Login attempt for:', credentials.email)
+
           const user = await prisma.user.findUnique({
-            where: { email: credentials.email }
+            where: { email: credentials.email.toLowerCase() }
           })
 
-          if (!user || !user.password) {
+          if (!user) {
+            console.log('User not found:', credentials.email)
             return null
           }
 
-          // Check if email is verified
+          console.log('User found:', { 
+            id: user.id, 
+            email: user.email, 
+            emailVerified: user.emailVerified,
+            hasPassword: !!user.password,
+            passwordLength: user.password?.length
+          })
+
           if (!user.emailVerified) {
-            throw new Error('Please verify your email before signing in')
-          }
-
-          // Verify password
-          const isValid = await bcrypt.compare(credentials.password, user.password)
-          
-          if (!isValid) {
+            console.log('Email not verified for user:', user.email)
             return null
           }
+
+          if (!user.password) {
+            console.log('No password set for user:', user.email)
+            return null
+          }
+
+          // Compare password using bcryptjs
+          console.log('Comparing password...')
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+          console.log('Password comparison result:', isPasswordValid)
+
+          if (!isPasswordValid) {
+            console.log('Invalid password for user:', user.email)
+            return null
+          }
+
+          console.log('Login successful for:', user.email)
 
           return {
             id: user.id,
             email: user.email,
             name: user.name,
-            image: user.profileImage
           }
         } catch (error) {
           console.error('Auth error:', error)
           return null
         }
       }
-    }),
-    // Facebook provider (for future use)
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID || '',
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET || ''
     })
   ],
   session: {
     strategy: 'jwt'
   },
   pages: {
-    signIn: '/auth/signin'
+    signIn: '/auth/signin',
+    signUp: '/auth/signup'
   },
   callbacks: {
     async jwt({ token, user }) {
@@ -81,8 +94,7 @@ const authOptions: NextAuthOptions = {
       return session
     }
   },
-  secret: process.env.NEXTAUTH_SECRET,
-}
+  debug: true // Enable debug logging
+})
 
-const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }

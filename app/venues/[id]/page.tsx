@@ -101,7 +101,6 @@ export default function VenueProfile() {
       <Navigation />
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
-        {/* Header Section */}
         <div style={{ 
           backgroundColor: 'white', 
           borderRadius: '0.5rem', 
@@ -174,9 +173,7 @@ export default function VenueProfile() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
-          {/* Main Content */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Organizer Info */}
             {organizer && (
               <div style={{ 
                 backgroundColor: 'white', 
@@ -243,7 +240,6 @@ export default function VenueProfile() {
               </div>
             )}
 
-            {/* Jam Night Details */}
             {venue.jamNightDetails && (
               <div style={{ 
                 backgroundColor: 'white', 
@@ -267,7 +263,6 @@ export default function VenueProfile() {
               </div>
             )}
 
-            {/* Upcoming Events Calendar */}
             <div style={{ 
               backgroundColor: 'white', 
               padding: '2rem', 
@@ -354,9 +349,7 @@ export default function VenueProfile() {
             </div>
           </div>
 
-          {/* Sidebar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-            {/* Equipment & Amenities */}
             <div style={{ 
               backgroundColor: 'white', 
               padding: '2rem', 
@@ -423,7 +416,6 @@ export default function VenueProfile() {
               )}
             </div>
 
-            {/* Quick Actions */}
             <div style={{ 
               backgroundColor: 'white', 
               padding: '2rem', 
@@ -511,7 +503,6 @@ export default function VenueProfile() {
               </div>
             </div>
 
-            {/* Venue Stats */}
             <div style={{ 
               backgroundColor: 'white', 
               padding: '2rem', 

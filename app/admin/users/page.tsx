@@ -3,42 +3,16 @@
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-
-interface User {
-  id: string
-  email: string
-  name: string
-  nickname?: string
-  role: string
-  status: string
-  phone?: string
-  phoneVerified: boolean
-  emailVerified: Date | null
-  lastLogin: Date | null
-  createdAt: Date
-  suspendedAt: Date | null
-  suspendedReason?: string
-}
+import Navigation from '../../components/Navigation'
 
 export default function AdminUsers() {
   const { data: session, status } = useSession()
   const router = useRouter()
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [filters, setFilters] = useState({
-    role: '',
-    status: '',
-    search: ''
-  })
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 25,
-    total: 0,
-    pages: 0
-  })
-  const [showPasswordReset, setShowPasswordReset] = useState<string | null>(null)
-  const [showRoleChange, setShowRoleChange] = useState<string | null>(null)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [message, setMessage] = useState('')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -47,606 +21,347 @@ export default function AdminUsers() {
       return
     }
     fetchUsers()
-  }, [session, status, router, filters, pagination.page])
+  }, [session, status, router])
 
   const fetchUsers = async () => {
-    setIsLoading(true)
     try {
-      const params = new URLSearchParams({
-        adminEmail: session?.user?.email || '',
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        ...(filters.role && { role: filters.role }),
-        ...(filters.status && { status: filters.status }),
-        ...(filters.search && { search: filters.search })
-      })
-
-      const response = await fetch(`/api/admin/users?${params}`)
+      const response = await fetch(`/api/admin/users?adminEmail=${session?.user?.email}`)
       if (response.ok) {
         const data = await response.json()
-        setUsers(data.users)
-        setPagination(prev => ({ ...prev, ...data.pagination }))
+        setUsers(data)
       } else {
+        console.error('Failed to fetch users')
         router.push('/dashboard')
       }
     } catch (error) {
-      console.error('Failed to fetch users:', error)
+      console.error('Admin users fetch error:', error)
       router.push('/dashboard')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handlePasswordReset = async (userId: string, customPassword?: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/reset-password?adminEmail=${session?.user?.email}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          temporaryPassword: customPassword || null,
-          forceChange: true 
-        })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        alert(`Password reset successfully!\n\nUser: ${data.userEmail}\nTemporary Password: ${data.temporaryPassword}\n\nPlease share this password securely with the user.`)
-        setShowPasswordReset(null)
-      } else {
-        alert(`Failed to reset password: ${data.error}`)
-      }
-    } catch (error) {
-      alert('Network error')
+  const handleResetPassword = async () => {
+    if (!selectedUser || !newPassword) {
+      setMessage('Please select a user and enter a new password')
+      return
     }
-  }
 
-  const handleRoleChange = async (userId: string, newRole: string, reason?: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/role?adminEmail=${session?.user?.email}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: newRole, reason })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        alert(`Role updated successfully!\n\nUser: ${data.userEmail}\nOld Role: ${data.oldRole}\nNew Role: ${data.newRole}`)
-        setShowRoleChange(null)
-        fetchUsers()
-      } else {
-        alert(`Failed to update role: ${data.error}`)
-      }
-    } catch (error) {
-      alert('Network error')
+    if (!session?.user?.email) {
+      setMessage('Admin email not found')
+      return
     }
-  }
 
-  const handleSuspendUser = async (userId: string, action: 'suspend' | 'unsuspend', reason?: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${userId}/suspend?adminEmail=${session?.user?.email}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, reason })
-      })
-
-      if (response.ok) {
-        fetchUsers()
-      } else {
-        alert('Failed to update user status')
-      }
-    } catch (error) {
-      alert('Network error')
-    }
-  }
-
-  const handleDeleteUser = async (userId: string, userName: string) => {
-    if (!confirm(`Are you sure you want to delete user "${userName}"? This action cannot be undone.`)) {
+    if (newPassword.length < 8) {
+      setMessage('Password must be at least 8 characters long')
       return
     }
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}?adminEmail=${session?.user?.email}`, {
-        method: 'DELETE'
+      console.log('Resetting password for user:', selectedUser.id)
+      console.log('Admin email:', session.user.email)
+      console.log('New password length:', newPassword.length)
+
+      const response = await fetch(`/api/admin/users/${selectedUser.id}/reset-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminEmail: session.user.email,
+          newPassword: newPassword
+        })
+      })
+
+      const data = await response.json()
+      console.log('Reset password response:', data)
+
+      if (response.ok) {
+        setMessage(`Password reset successfully for ${selectedUser.email}`)
+        setSelectedUser(null)
+        setNewPassword('')
+      } else {
+        setMessage(`Failed to reset password: ${data.error || 'Unknown error'}`)
+        console.error('Password reset failed:', data)
+      }
+    } catch (error) {
+      console.error('Password reset error:', error)
+      setMessage('Network error. Please try again.')
+    }
+  }
+
+  const handleSuspendUser = async (user: any) => {
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/suspend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          adminEmail: session?.user?.email,
+          suspend: !user.suspended
+        })
       })
 
       if (response.ok) {
+        setMessage(`User ${user.suspended ? 'activated' : 'suspended'} successfully`)
         fetchUsers()
       } else {
-        alert('Failed to delete user')
+        const data = await response.json()
+        setMessage(`Failed to ${user.suspended ? 'activate' : 'suspend'} user: ${data.error}`)
       }
     } catch (error) {
-      alert('Network error')
-    }
-  }
-
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'admin': return { bg: '#fef3c7', color: '#92400e' }
-      case 'organizer': return { bg: '#dbeafe', color: '#1e40af' }
-      case 'performer': return { bg: '#d1fae5', color: '#065f46' }
-      default: return { bg: '#f3f4f6', color: '#374151' }
-    }
-  }
-
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'active': return { bg: '#d1fae5', color: '#065f46' }
-      case 'suspended': return { bg: '#fee2e2', color: '#991b1b' }
-      case 'pending': return { bg: '#fef3c7', color: '#92400e' }
-      default: return { bg: '#f3f4f6', color: '#374151' }
+      console.error('Suspend user error:', error)
+      setMessage('Network error. Please try again.')
     }
   }
 
   if (status === 'loading' || isLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⏳</div>
-          <div>Loading users...</div>
+      <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+        <Navigation />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4rem' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚙️</div>
+            <div>Loading users...</div>
+          </div>
         </div>
       </div>
     )
   }
 
+  if (!session) return null
+
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6' }}>
-      {/* Admin Header */}
-      <div style={{ backgroundColor: '#1f2937', color: 'white', padding: '1rem' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <Link href="/admin" style={{ color: '#93c5fd', textDecoration: 'none' }}>← Admin Dashboard</Link>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>User Management</h1>
-          </div>
-          <Link 
-            href="/admin/users/create"
-            style={{ 
-              backgroundColor: '#2563eb', 
-              color: 'white', 
-              padding: '0.5rem 1rem', 
-              borderRadius: '0.375rem', 
-              textDecoration: 'none' 
-            }}
-          >
-            Create User
-          </Link>
-        </div>
-      </div>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f9fafb' }}>
+      <Navigation />
 
-      <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '2rem 1rem' }}>
-        {/* Filters */}
-        <div style={{ 
-          backgroundColor: 'white', 
-          padding: '1.5rem', 
-          borderRadius: '0.5rem', 
-          marginBottom: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-                Search Users
-              </label>
-              <input
-                type="text"
-                placeholder="Search by name or email..."
-                value={filters.search}
-                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '0.375rem' 
-                }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-                Filter by Role
-              </label>
-              <select
-                value={filters.role}
-                onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '0.375rem' 
-                }}
-              >
-                <option value="">All Roles</option>
-                <option value="performer">Performers</option>
-                <option value="organizer">Organizers</option>
-                <option value="admin">Admins</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.5rem' }}>
-                Filter by Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                style={{ 
-                  width: '100%', 
-                  padding: '0.75rem', 
-                  border: '1px solid #d1d5db', 
-                  borderRadius: '0.375rem' 
-                }}
-              >
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-          </div>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem 1rem' }}>
+        <div style={{ marginBottom: '2rem' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem', color: '#1f2937' }}>
+            User Management
+          </h1>
+          <p style={{ color: '#6b7280' }}>
+            Manage user accounts, reset passwords, and handle suspensions
+          </p>
         </div>
 
-        {/* Users Table */}
-        <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>
-              Users ({pagination.total})
-            </h2>
-          </div>
-
-          {users.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>👥</div>
-              <p>No users found matching your criteria</p>
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', fontSize: '0.875rem' }}>
-                <thead style={{ backgroundColor: '#f9fafb' }}>
-                  <tr>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>User</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Role</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Status</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Phone</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Created</th>
-                    <th style={{ padding: '0.75rem', textAlign: 'left', fontWeight: '600' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => {
-                    const roleColor = getRoleBadgeColor(user.role)
-                    const statusColor = getStatusBadgeColor(user.status)
-                    
-                    return (
-                      <tr key={user.id} style={{ borderBottom: '1px solid #e5e7eb' }}>
-                        <td style={{ padding: '0.75rem' }}>
-                          <div>
-                            <div style={{ fontWeight: '500' }}>{user.name}</div>
-                            <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>{user.email}</div>
-                            {user.nickname && (
-                              <div style={{ color: '#6b7280', fontSize: '0.75rem' }}>"{user.nickname}"</div>
-                            )}
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <span style={{
-                              backgroundColor: roleColor.bg,
-                              color: roleColor.color,
-                              padding: '0.25rem 0.5rem',
-                              borderRadius: '9999px',
-                              fontSize: '0.75rem',
-                              fontWeight: '500'
-                            }}>
-                              {user.role}
-                            </span>
-                            <button
-                              onClick={() => setShowRoleChange(user.id)}
-                              style={{
-                                backgroundColor: '#f3f4f6',
-                                border: '1px solid #d1d5db',
-                                borderRadius: '0.25rem',
-                                padding: '0.25rem',
-                                cursor: 'pointer',
-                                fontSize: '0.75rem'
-                              }}
-                            >
-                              Change
-                            </button>
-                          </div>
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          <span style={{
-                            backgroundColor: statusColor.bg,
-                            color: statusColor.color,
-                            padding: '0.25rem 0.5rem',
-                            borderRadius: '9999px',
-                            fontSize: '0.75rem',
-                            fontWeight: '500'
-                          }}>
-                            {user.status}
-                          </span>
-                          {user.suspendedReason && (
-                            <div style={{ color: '#6b7280', fontSize: '0.75rem', marginTop: '0.25rem' }}>
-                              {user.suspendedReason}
-                            </div>
-                          )}
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          {user.phone ? (
-                            <div>
-                              <div>{user.phone}</div>
-                              <div style={{ color: user.phoneVerified ? '#10b981' : '#f59e0b', fontSize: '0.75rem' }}>
-                                {user.phoneVerified ? 'Verified' : 'Unverified'}
-                              </div>
-                            </div>
-                          ) : (
-                            <span style={{ color: '#6b7280' }}>-</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '0.75rem', color: '#6b7280' }}>
-                          {new Date(user.createdAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '0.75rem' }}>
-                          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                            <button
-                              onClick={() => setShowPasswordReset(user.id)}
-                              style={{
-                                backgroundColor: '#dbeafe',
-                                color: '#1e40af',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.375rem',
-                                border: 'none',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Reset Password
-                            </button>
-                            
-                            {user.status === 'active' ? (
-                              <button
-                                onClick={() => {
-                                  const reason = prompt('Reason for suspension:')
-                                  if (reason) handleSuspendUser(user.id, 'suspend', reason)
-                                }}
-                                style={{
-                                  backgroundColor: '#fef3c7',
-                                  color: '#92400e',
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '0.375rem',
-                                  border: 'none',
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Suspend
-                              </button>
-                            ) : user.status === 'suspended' ? (
-                              <button
-                                onClick={() => handleSuspendUser(user.id, 'unsuspend')}
-                                style={{
-                                  backgroundColor: '#d1fae5',
-                                  color: '#065f46',
-                                  padding: '0.25rem 0.5rem',
-                                  borderRadius: '0.375rem',
-                                  border: 'none',
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Unsuspend
-                              </button>
-                            ) : null}
-                            
-                            <button
-                              onClick={() => handleDeleteUser(user.id, user.name)}
-                              style={{
-                                backgroundColor: '#fee2e2',
-                                color: '#991b1b',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: '0.375rem',
-                                border: 'none',
-                                fontSize: '0.75rem',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {pagination.pages > 1 && (
-            <div style={{ padding: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}>
-              <button
-                onClick={() => setPagination({ ...pagination, page: Math.max(1, pagination.page - 1) })}
-                disabled={pagination.page === 1}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  backgroundColor: pagination.page === 1 ? '#f9fafb' : 'white',
-                  cursor: pagination.page === 1 ? 'not-allowed' : 'pointer'
-                }}
-              >
-                Previous
-              </button>
-              <span style={{ padding: '0.5rem 1rem', color: '#6b7280' }}>
-                Page {pagination.page} of {pagination.pages}
-              </span>
-              <button
-                onClick={() => setPagination({ ...pagination, page: Math.min(pagination.pages, pagination.page + 1) })}
-                disabled={pagination.page === pagination.pages}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '0.375rem',
-                  backgroundColor: pagination.page === pagination.pages ? '#f9fafb' : 'white',
-                  cursor: pagination.page === pagination.pages ? 'not-allowed' : 'pointer'
-                }}
-              >
-                Next
-              </button>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Password Reset Modal */}
-      {showPasswordReset && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            minWidth: '400px',
-            maxWidth: '500px'
+        {message && (
+          <div style={{
+            padding: '1rem',
+            borderRadius: '0.375rem',
+            marginBottom: '2rem',
+            backgroundColor: message.includes('success') ? '#d1fae5' : '#fee2e2',
+            color: message.includes('success') ? '#065f46' : '#991b1b',
+            border: `1px solid ${message.includes('success') ? '#a7f3d0' : '#fecaca'}`
           }}>
-            <h3 style={{ marginBottom: '1rem', fontWeight: '600' }}>Reset Password</h3>
-            <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
-              Choose to generate a random password or set a custom one:
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem' }}>
-              <button
-                onClick={() => handlePasswordReset(showPasswordReset)}
-                style={{
-                  backgroundColor: '#2563eb',
-                  color: 'white',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Generate Random Password
-              </button>
-              <button
-                onClick={() => {
-                  const customPassword = prompt('Enter custom password (min 8 characters):')
-                  if (customPassword && customPassword.length >= 8) {
-                    handlePasswordReset(showPasswordReset, customPassword)
-                  } else if (customPassword) {
-                    alert('Password must be at least 8 characters long')
-                  }
-                }}
-                style={{
-                  backgroundColor: '#10b981',
-                  color: 'white',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Set Custom Password
-              </button>
-            </div>
-            <button
-              onClick={() => setShowPasswordReset(null)}
-              style={{
-                backgroundColor: '#6b7280',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                width: '100%'
-              }}
-            >
-              Cancel
-            </button>
+            {message}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Role Change Modal */}
-      {showRoleChange && (
-        <div style={{ 
-          position: 'fixed', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
-          backgroundColor: 'rgba(0,0,0,0.5)', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{ 
-            backgroundColor: 'white', 
-            padding: '2rem', 
-            borderRadius: '0.5rem', 
-            minWidth: '400px'
+        {selectedUser && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 50
           }}>
-            <h3 style={{ marginBottom: '1rem', fontWeight: '600' }}>Change User Role</h3>
-            <p style={{ marginBottom: '1.5rem', color: '#6b7280' }}>
-              Select the new role for this user:
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1rem' }}>
-              {['performer', 'organizer', 'admin'].map(role => (
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '0.5rem',
+              padding: '2rem',
+              maxWidth: '500px',
+              width: '90%',
+              maxHeight: '90vh',
+              overflow: 'auto'
+            }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>
+                Reset Password for {selectedUser.name}
+              </h3>
+              <p style={{ color: '#6b7280', marginBottom: '1rem', fontSize: '0.875rem' }}>
+                Email: {selectedUser.email}
+              </p>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', fontWeight: '500', marginBottom: '0.5rem' }}>
+                  New Password (minimum 8 characters)
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                  minLength={8}
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    fontSize: '1rem'
+                  }}
+                />
+                <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                  Password must be at least 8 characters long
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
                 <button
-                  key={role}
                   onClick={() => {
-                    const reason = prompt(`Reason for changing role to ${role}:`)
-                    if (reason !== null) {
-                      handleRoleChange(showRoleChange!, role, reason)
-                    }
+                    setSelectedUser(null)
+                    setNewPassword('')
+                    setMessage('')
                   }}
                   style={{
-                    backgroundColor: '#f3f4f6',
+                    padding: '0.75rem 1rem',
                     border: '1px solid #d1d5db',
-                    padding: '0.75rem',
                     borderRadius: '0.375rem',
-                    cursor: 'pointer',
-                    textAlign: 'left'
+                    backgroundColor: 'white',
+                    color: '#374151',
+                    fontSize: '0.875rem',
+                    cursor: 'pointer'
                   }}
                 >
-                  <strong>{role.charAt(0).toUpperCase() + role.slice(1)}</strong>
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    {role === 'performer' && 'Can sign up for events and manage personal profile'}
-                    {role === 'organizer' && 'Can create and manage events at venues (requires phone verification)'}
-                    {role === 'admin' && 'Full system access including user and venue management'}
-                  </div>
+                  Cancel
                 </button>
-              ))}
+                <button
+                  onClick={handleResetPassword}
+                  disabled={newPassword.length < 8}
+                  style={{
+                    padding: '0.75rem 1rem',
+                    border: 'none',
+                    borderRadius: '0.375rem',
+                    backgroundColor: newPassword.length >= 8 ? '#dc2626' : '#9ca3af',
+                    color: 'white',
+                    fontSize: '0.875rem',
+                    cursor: newPassword.length >= 8 ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  Reset Password
+                </button>
+              </div>
             </div>
-            <button
-              onClick={() => setShowRoleChange(null)}
-              style={{
-                backgroundColor: '#6b7280',
-                color: 'white',
-                padding: '0.5rem 1rem',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                width: '100%'
-              }}
-            >
-              Cancel
-            </button>
+          </div>
+        )}
+
+        <div style={{ backgroundColor: 'white', borderRadius: '0.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <div style={{ padding: '1.5rem', borderBottom: '1px solid #e5e7eb' }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: '600' }}>All Users ({users.length})</h2>
+          </div>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ backgroundColor: '#f9fafb' }}>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>
+                    User
+                  </th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>
+                    Status
+                  </th>
+                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>
+                    Joined
+                  </th>
+                  <th style={{ padding: '1rem', textAlign: 'right', fontSize: '0.75rem', fontWeight: '500', color: '#6b7280', textTransform: 'uppercase' }}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user: any, index) => (
+                  <tr key={user.id} style={{ borderBottom: index < users.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
+                    <td style={{ padding: '1rem' }}>
+                      <div>
+                        <div style={{ fontWeight: '500', color: '#1f2937' }}>{user.name}</div>
+                        <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>{user.email}</div>
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span style={{
+                          display: 'inline-block',
+                          padding: '0.25rem 0.75rem',
+                          borderRadius: '9999px',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          backgroundColor: user.emailVerified ? '#d1fae5' : '#fee2e2',
+                          color: user.emailVerified ? '#065f46' : '#991b1b'
+                        }}>
+                          {user.emailVerified ? 'Verified' : 'Unverified'}
+                        </span>
+                        {user.suspended && (
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '9999px',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            backgroundColor: '#fef3c7',
+                            color: '#92400e'
+                          }}>
+                            Suspended
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td style={{ padding: '1rem', color: '#6b7280', fontSize: '0.875rem' }}>
+                      {new Date(user.createdAt).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '1rem', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button
+                          onClick={() => setSelectedUser(user)}
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            color: '#dc2626',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #dc2626',
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Reset Password
+                        </button>
+                        
+                        <button
+                          onClick={() => handleSuspendUser(user)}
+                          style={{
+                            padding: '0.5rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            color: user.suspended ? '#059669' : '#d97706',
+                            backgroundColor: 'transparent',
+                            border: `1px solid ${user.suspended ? '#059669' : '#d97706'}`,
+                            borderRadius: '0.375rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {user.suspended ? 'Activate' : 'Suspend'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#6b7280' }}>
+                      No users found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-      )}
+      </main>
     </div>
   )
 }
